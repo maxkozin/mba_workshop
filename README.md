@@ -20,8 +20,8 @@
 - https://developers.facebook.com/documentation/meta-business-agent
 
 ### Workshop instructions
-#### 1. Import both files into Postman.
-#### 2. Select the MBA Workshop — ElecStore environment.
+#### 1. Import collections into Postman.
+#### 2. Select the "MBA Workshop — env (Store API)" environment.
 #### 3. Fill in variables:
 
 | Variable	| Value |
@@ -31,22 +31,21 @@
 | `CONSUMER_PHONE` |	Your own test number in E.164, e.g. +5511999998888 |
 | `SUPPORT_PHONE` |	The number the agent points at when it hands off, digits only |
 
-#### 4. Run API call from 01.xxx to 22.xxx one-by-one:
-
-Onboarding → Settings → Business info → FAQs → Behaviour skills → Connector and Tools → Connector skills → Allowlist → Rollout
+#### 4. Run API calls one-by-one.
 
 Note: `AGENT_ID` and `CONNECTOR_ID` variables are captured automatically, nothing to copy-paste between requests.
 
 #### 5. Mock tools - E-commerce Simulator
 
-| Variable	| Value |
+| Variable	| Value
 | --- | --- |
-| `SHOP_API_KEY` | a sandbox key for a shared demo tenant |
-| `SHOP_API` | points at a public ecommerce simulator, mock_ecommerce_api |
+| `SHOP_API_KEY` | a API key for DemoStore will be provided at the workshop |
+| `SHOP_API` | API endpoint for DemoStore  will be provided at the workshop |
 
 #### 6. Workshop outcome
 
-The agent that answers "what do you sell?", "how much is it?", "do you have it in black?" and "is it in stock?" from live catalogue data, over WhatsApp — rendering the results as a carousel with tappable buttons rather than a wall of text. It deliberately cannot take an order — cart, checkout and payment are out of scope, and the skills tell it to hand off for anything it has no tool for. Ask it to buy something and watch it pass you to a human rather than invent a checkout. That is the agent working, not failing.
+The fully working agent that answers customers questions from live product catalog data, renders results as interactive messages.
+The agent is unable take orders — cart, checkout and payments are out of scope.
 
 Thank you!
 
