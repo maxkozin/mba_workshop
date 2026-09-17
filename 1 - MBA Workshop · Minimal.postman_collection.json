@@ -1,0 +1,1830 @@
+{
+  "info": {
+    "name": "1 · MBA Workshop — Basic (ElecStore)",
+    "description": "# Meta Business Agent (MBA) — Basic workshop track\n\nStand up a working WhatsApp **product-discovery** agent for **ElecStore**, a\nBrazilian electronics store, in nine numbered steps. This is the track run live in\nthe workshop; budget about 40 minutes.\n\n**Run the folders in order, and the requests inside each folder in order.**\nIds flow forward automatically — `AGENT_ID`, `CONNECTOR_ID`, every\n`toolId_*` and every `skillId_*` are captured by test scripts, so nothing has\nto be copy-pasted.\n\n## Scope: discovery, not the whole purchase\n\nThe agent you finish with can answer *\"what do you sell?\"*, *\"how much is it?\"*,\n*\"do you have it in black?\"* and *\"is it in stock?\"* — and it renders the answers\nas a WhatsApp carousel with quick-reply pills.\n\nIt deliberately **cannot** take an order. Cart, checkout, payment and order status\nare the Advanced collection. Three reasons that is the right cut for a live hour:\n\n- Discovery is where the agent's judgement is actually visible. Registering fifteen\n  more tools teaches registration, not agents.\n- Every one of those steps is a state machine, and debugging one on stage costs the\n  room the other eight.\n- The skills here tell the agent to hand off for anything it has no tool for, so a\n  discovery-only agent is *correct*, not *broken*.\n\n## What you are building\n\n```\nWhatsApp customer\n   │\n   ▼\nMeta Business Agent  ── behaviour skills say WHO it is        (stage 5)\n   │                    connector skills say HOW to sell     (stage 7)\n   ▼  Meta Business Agent runtime\nConnector (elecstore)  ── one base URL + one API key     (stage 6)\n   │  3 discovery tools                                          (stage 6)\n   ▼\nMock ecommerce API — electronics catalogue, prices, stock, images\n```\n\n## Before you start\n\nFill in the environment (**MBA Workshop** environment file, imported alongside\nthis collection). The store is already deployed and seeded — you only need the\nWhatsApp side:\n\n| Variable | Where it comes from |\n|---|---|\n| `ENTITY_ID` | WhatsApp Business **Phone Number ID** |\n| `MBA_ACCESS_TOKEN` | Token with the `whatsapp_business_messaging` permission |\n| `CONSUMER_PHONE` | Your own test number in E.164, e.g. `+5511999998888` |\n| `SUPPORT_PHONE` | Human-handoff number, digits only |\n\n`SHOP_API` and `SHOP_API_KEY` (`demo-store_1`) are pre-filled and the number\nis assumed to be already registered on Cloud API.\n\n**Prerequisite that fails silently:** the WhatsApp Business Asset must already be\nprovisioned for custom connectors. That is done by Meta, not by this API, and\nconnector creation fails without it. If the **connector** request fails before any id\ncomes back, that is the first thing to check.\n\n## Why the order is what it is\n\n1. **Store first** — prove the shop is awake before blaming the agent.\n2. **Onboard with the agent switched off** (`rollout.enabled: false`,\n   `ai_audience: ALLOWLISTED_ONLY`) so a half-configured agent never answers a\n   real customer. Rollout goes on at stage 9, last.\n3. **Knowledge, then behaviour, then connector, then tools, then tool skills.**\n   Folders 3 and 4 need no connector at all — you can have an agent that answers\n   FAQs correctly and hands off gracefully before you have written a line of\n   integration. That is worth showing on its own, because it is the state most\n   businesses should launch in.\n4. **Tools before the skills that use them** (6 before 7). A skill naming a tool\n   that does not exist is the most confusing failure in this whole surface.\n\n---\n\n# Stage guide\n\nThe collection is flat on purpose — the sidebar is the running order, top to bottom. The stages below are what the numbers mean. Nothing here is a folder you have to expand; it is just the reasoning, kept out of your way while you run.\n\n| # | Stage | Requests |\n|---|---|---|\n| 1 | Onboard the agent | 01–01 |\n| 2 | Settings | 02–02 |\n| 3 | Business info | 03–03 |\n| 4 | FAQs | 04–05 |\n| 5 | Basic skills — behaviour, before any integration | 06–09 |\n| 6 | Connector and tools | 10–13 |\n| 7 | Connector skills | 14–18 |\n| 8 | Allowlist | 19–19 |\n| 9 | Go live | 20–20 |\n| 10 | Hand off to a human | 21–22 |\n| A | Appendix — reads, none of them required | A1–A8 |\n\n## Stage 1 — Onboard the agent\n*Requests 01–01*\n\nCreate the agent on this phone number. Everything after this hangs off the `AGENT_ID` this returns.\n\nThe number is assumed to be already registered on Cloud API.\n\n## Stage 2 — Settings\n*Requests 02–02*\n\nConfigure the agent **before** anyone can reach it. Two things make that true at once, and they are independent:\n\n- `rollout.enabled: false` — the agent exists but does not answer anyone.\n- `ai_audience: ALLOWLISTED_ONLY` with an **empty allowlist** — even if rollout were on, there is nobody it is permitted to answer.\n\nThat is deliberate belt-and-braces. The allowlist is not populated until stage 8 and rollout is not flipped until stage 9, so the entire configuration run happens with the agent doubly unreachable. A half-configured agent answering a real customer is the worst outcome of a workshop and this is what prevents it.\n\n## Stage 3 — Business info\n*Requests 03–03*\n\nThe single record holding what the business *is* — description, payment methods, returns, delivery, hours, contact. One PUT replaces the whole thing.\n\nThis is retrieved, not reasoned. Anything not here and not in a tool response is something the agent must say it does not know — which is exactly what the foundation skill in stage 5 enforces.\n\n## Stage 4 — FAQs\n*Requests 04–05*\n\nQuestion-and-answer pairs, matched on the **question**. Phrase each one the way a customer would type it, not the way the business would title a help-centre article.\n\nTwo is enough to teach the shape; the endpoint is the same request with different text. Add the rest from your own store.\n\nRe-posting the same question leaves two copies, and duplicated knowledge produces the same inconsistent answers that duplicated skills do — read them back with `faq: list` in the appendix before you add more.\n\n## Stage 5 — Basic skills — behaviour, before any integration\n*Requests 06–09*\n\nThese four skills need **no connector and no tools**. They define who the agent is, what it refuses to invent, when it stops and fetches a human, and what it does with a photo.\n\nUploading them now, before the connector exists, is the point of this stage. At the end of it you have an agent that answers FAQs correctly, admits what it cannot do, and hands off gracefully — with zero integration work. **That is a shippable state**, and the one most businesses should launch in before wiring a single API. It is worth pausing on.\n\n## One thing that will bite you\n\n- **Give each skill one job.** If two skills both tell the agent what to do first in the same situation, you get duplicate or contradictory replies. Each skill here says up front when it applies and when it does not, and the foundation skill sets standing rules without claiming a trigger of its own.\n\n## Stage 6 — Connector and tools\n*Requests 10–13*\n\nA **connector** is one external API integration: a base URL, connector-level authentication, and optionally mTLS or a per-user token rule. You create it once. A **tool** is one operation on it — a method, a path, its parameters and their descriptions. Once a tool exists it is advertised to the agent automatically; there is no separate registration step.\n\n**Connector auth is not user auth.** Connector auth is how the integration authenticates to *your* API, configured once here. User auth is a per-shopper token injected at tool-call time — this store has none, so every tool sets `user_auth_required: false`.\n\n**Fewer tools select better.** Three is what product discovery needs. The other eighteen are in the Advanced collection; add them one conversation at a time, because every tool you add competes for the agent's attention and makes it pick worse on the ones that matter.\n\n## The description is a prompt, not documentation\n\nIt is the main thing driving whether the agent picks the right tool and fills it in correctly. Write *when to use this*:\n\n> ✗ \"Returns a paginated list of products.\"\n>\n> ✓ \"Search the catalogue. Use whenever the customer asks what is available… the variant is what carries the colour, the storage and its own price… prefer limit=3 so the reply stays readable in chat.\"\n\nThe second encodes a failure mode and a channel constraint. Both are things the agent otherwise gets wrong. Read all three tool bodies with that in mind — the descriptions are the actual work.\n\n## Stage 7 — Connector skills\n*Requests 14–18*\n\nRegistering tools makes them callable. It does not make the agent use them *well*. Two different resources do that, and the distinction matters:\n\n| Resource | What it is |\n|---|---|\n| `POST /agent_config/skills` | Text instructions. Shape behaviour. |\n| `POST /agent-ui-skills` | Register an interactive component + when to trigger it. |\n\nA text skill cannot make a carousel render, and a UI skill alone will render one at the wrong moment. You need both.\n\n- `discovery` names `search_products`, `get_product` and `list_categories`, says when to call each, and encodes the product-vs-variant trap.\n- `rich-ui-carousel` and `quick-reply-pills` govern presentation discipline — how many cards, one component per turn, what to do when nothing renders.\n- The two UI skills register `carousel_quick_reply` and `interactive_list` and carry the trigger instruction the agent reads.\n\n**Order matters — all of this comes after stage 6.** A skill that names a tool which does not exist is the most confusing failure on this surface: the agent neither errors nor complies, it just quietly does something else.\n\n## Five rules worth writing into every skill\n\n1. **Never invent a value.** If a field cannot be filled from a tool response, the conversation, or a default, do not render the component.\n2. **Say where ids come from.** \"Product ids must come from `search_products`\" is the sentence that stops the agent using an id from somewhere else.\n3. **Keep the component text short and fixed.** The message and the component arrive separately, so putting the product list in both makes the customer read it twice.\n4. **No \"above\" or \"below\".** The component lands underneath the text, so say \"here are some options\" instead.\n5. **One job per skill.** Two skills claiming the same moment produce duplicate replies. Merge them into one with ordered steps, and let only the last step speak.\n\n## Stage 8 — Allowlist\n*Requests 19–19*\n\nNow — and not before — say who is allowed to reach the agent.\n\nDoing this last is the whole safety model. `ai_audience` has been `ALLOWLISTED_ONLY` since stage 2 with nobody on the list, so through every configuration step above there was no consumer the agent could have answered even if rollout had been on.\n\nAdd every phone that will be used in the demo, including the presenter's. A number that is not on the list gets **silence**, which looks identical to a broken agent — the most common self-inflicted wound in a workshop room.\n\n## Stage 9 — Go live\n*Requests 20–20*\n\nEverything the agent needs now exists: knowledge, behaviour, a connector, three tools, the skills that use them, and an allowlist with a real number on it. Turn it on.\n\n## Stage 10 — Hand off to a human\n*Requests 21–22*\n\nNot setup — the operational pair you will want during the demo. The agent is not the only participant in the thread; thread control decides who owns it.\n\nReleasing mutes the agent for one consumer so a person can answer; taking hands the conversation back. Nothing the customer sees changes — the next reply simply comes from somewhere else.\n\n## Appendix — Appendix — reads, none of them required\n*Requests A1–A8*\n\nEvery request above changes state. Every request here only looks at it, and none is needed to stand the agent up — which is why they are out of the running order rather than interleaved with it.\n\nThey earn their place at three specific moments:\n\n- **Before you start.** `store: health` and `store: products` prove the shop is awake and the API key works. If the store is asleep or the key is wrong, every later symptom points at the agent and none of them are about the agent. A free-tier deployment sleeps when idle, so run health twice if the first is slow.\n- **Before you create.** `faq: list`, `skill: list`, `connector: list`, `tool: list` and `ui-skill: list` all answer the same question: does this already exist? Creating a duplicate skill or a third connector on the same number is the classic workshop mess, and listing first is the habit that avoids it.\n- **When something looks wrong.** `settings: read` is the cheapest way to prove your token resolves this entity and to see what `rollout` and `ai_audience` actually are, rather than what you believe you set them to.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. onboarding",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_onboarding?channel=whatsapp",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_onboarding"
+          ],
+          "query": [
+            {
+              "key": "channel",
+              "value": "whatsapp"
+            }
+          ]
+        },
+        "description": "Creates the agent settings on this phone number and returns `agent_id`, which the test script captures into `AGENT_ID`.\n\nThis is also the ToS gate: if the WABA has not accepted the MBA Terms of Service, this fails. \"No settings ent\" and \"ToS not accepted\" are the same failure — accept the terms in WhatsApp Manager and retry.",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.agent_id ?? j.data?.agent_id ?? (Array.isArray(j.data) ? j.data[0]?.agent_id : undefined);",
+              "  if (v) { setVar('AGENT_ID', v); console.log('AGENT_ID =', v); }",
+              "  else console.warn('AGENT_ID not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "02. settings: rollout=false + allowlist only",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/settings?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "settings"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Four settings, and the order they matter in:\n\n- `rollout.enabled: false` — the agent is created but does not answer. Turn it on at `settings: FINAL rollout=true`, once everything else exists.\n- `ai_audience: ALLOWLISTED_ONLY` — only numbers added at `allowlist` reach the agent, and that runs near the end. The alternative is `EVERYONE`.\n- `handoff` — what the customer sees when the agent gives up. Set it in your own words; the default is generic.\n- `followup` — re-engagement inside the 24-hour window.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rollout\": {\n    \"enabled\": false\n  },\n  \"ai_audience\": \"ALLOWLISTED_ONLY\",\n  \"handoff\": {\n    \"enabled\": true,\n    \"message\": \"Let me bring in a colleague from ElecStore to help with this. You can also reach our team at https://wa.me/{{SUPPORT_PHONE}}.\"\n  },\n  \"followup\": {\n    \"enabled\": true,\n    \"message\": \"Still here whenever you would like to pick this up again.\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "03. business_info",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/business_info",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "business_info"
+          ]
+        },
+        "description": "One PUT replaces the whole record. Keep it short and factual: everything here is competing for the agent's attention with the skills and the tool descriptions.\n\nNote what is **not** here — no instalment count, no interest rate. The agent is told (Advanced skill `payment-options-br`) never to state one that is not written down, because in Brazil that is a pricing claim rather than a UX detail.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"business_description\": \"ElecStore is an online electronics retailer: smartphones, audio, computers, accessories and smart home devices. A single own-brand store rather than a marketplace — the agent only assists with products sold and shipped by ElecStore.\\n\",\n  \"payment_method\": \"PIX, payment link and credit card. We never accept card details over chat.\",\n  \"return_policy\": \"Change of mind: 7 calendar days from delivery, sealed or with no signs of use.\\nStatutory 90-day warranty plus a 12-month manufacturer warranty on every device.\\nFaulty or damaged in transit: report it in chat and an agent opens a case.\\n\",\n  \"purchase_info\": \"The purchase completes inside WhatsApp: the agent builds the cart, confirms the address and sends a PIX code or a payment link.\",\n  \"delivery_and_shipping\": \"Nationwide delivery. Standard 3–7 business days, express 1–2 business days.\\nFree shipping over 299.00. The tracking code appears on the order detail.\\n\",\n  \"contact_info\": {\n    \"email\": \"support@elecstore.com\",\n    \"hours_of_operation\": \"Mon–Fri, 9am–6pm; Sat, 9am–1pm\",\n    \"address\": \"São Paulo, Brazil\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "04. faq: How long does delivery take and how much is shipping?",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/faq",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "faq"
+          ]
+        },
+        "description": "FAQs are matched on the **question**, so phrase it the way a customer would type it, not the way the business would title a help-centre article.\n\nAlso `GET` (list and by id), `PUT /{faq_id}`, `DELETE /{faq_id}`.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"How long does delivery take and how much is shipping?\",\n  \"answer\": \"We deliver nationwide. Standard is 3–7 business days, express 1–2. Shipping is free over 299.00, and the exact amount is shown at checkout once we have your postcode.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('FAQ_ID', v); console.log('FAQ_ID =', v); }",
+              "  else console.warn('FAQ_ID not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "05. faq: What warranty do the products come with?",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/faq",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "faq"
+          ]
+        },
+        "description": "FAQs are matched on the **question**, so phrase it the way a customer would type it, not the way the business would title a help-centre article.\n\nAlso `GET` (list and by id), `PUT /{faq_id}`, `DELETE /{faq_id}`.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"What warranty do the products come with?\",\n  \"answer\": \"Every device carries a statutory 90-day warranty plus a 12-month manufacturer warranty. To claim it, just tell us here and we will open the case.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "06. skill: foundation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Always-on rules for the ElecStore assistant — what it must never invent, never ask for card numbers in chat, how to read ids from tool responses, how to write for WhatsApp, and when to hand off to a human.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"foundation\",\n  \"description\": \"Always-on rules for the ElecStore assistant — what it must never invent, never ask for card numbers in chat, how to read ids from tool responses, how to write for WhatsApp, and when to hand off to a human.\",\n  \"skill\": \"# Foundation - identity, safety and tool discipline\\n\\nAPPLIES: always, as background rules.\\nDOES NOT APPLY as a trigger - this skill never tells you to do something \\\"first\\\"\\nwhen a customer messages. Stage skills own the triggers.\\n\\n## Who you are\\nYou are the assistant for **ElecStore**, an online electronics store in\\nBrazil selling smartphones, audio, computers, accessories and smart home devices.\\nYou can search the catalogue, build a cart, take an order, start a payment and\\nreport delivery status, all through connector tools. You never invent stock,\\nprices, specifications, delivery dates or order status - if a tool did not tell\\nyou, you do not know it.\\n\\n## Never do these\\n- Never ask for, accept or repeat card numbers, CVVs or full card details in chat.\\n  Payment happens through a PIX code or a payment link, never in the message thread.\\n- Never quote a price, stock level, specification or delivery date you have not read\\n  from a tool response in this conversation. Electronics customers compare specs -\\n  an invented RAM figure or battery capacity is worse than saying you will check.\\n- Never invent an order number, tracking code, PIX code or payment link.\\n- Never promise a refund, discount, warranty outcome or delivery date the tools have\\n  not confirmed.\\n\\n## Using tools\\n- Read ids carefully. Products have a product id; the thing you add to a cart is a\\n  VARIANT id. In this catalogue the variant is what carries the colour, the storage\\n  size and the memory - \\\"Smartphone 128GB, Preto\\\" is a variant, not a product.\\n  Passing a product id to add_cart_item will fail.\\n- Reuse ids you already have in the conversation rather than searching again.\\n- The customer's phone number is filled in automatically on the tools that need it.\\n  Never ask for it and never type it yourself.\\n- If a tool returns an error, tell the customer what it means in plain language and\\n  what you will do next. Do not restate the raw error or the status code.\\n\\n## Writing for WhatsApp\\n- Short messages. No markdown tables, no headings, no long bullet lists.\\n- At most 3 products per message, each on its own line with name and price.\\n- Quote the price exactly as the tool returned it, with its currency. Do not\\n  reformat it and do not convert it.\\n- One question at a time. Never ask for the address, the payment method and the\\n  delivery option in a single message.\\n- Match the customer's language, whatever they write in.\\n\\n## Only claim what your tools can actually do\\nThe set of tools registered on this agent is the set of things you can do. If there\\nis no tool for something — no cart tool, no payment tool, no refund tool — then for\\nthis agent that capability does not exist. Do not describe it, do not offer it, and\\ndo not improvise it in text. Treat it as out of scope and follow the\\ncapability-disclaimer skill.\\n\\nThis matters because these instructions are written for the whole store, and an\\nagent is often set up in stages. An agent that can search the catalogue but cannot\\nyet take an order must not offer to take an order.\\n\\n## Handing off\\nHanding off to a human is governed by the handoff-guardrails skill. That skill owns\\nthe decision and the wording; this one only states the standing rule: **do not keep\\nretrying silently, and do not guess an answer to avoid handing off.**\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_00-foundation', v); console.log('skillId_00-foundation =', v); }",
+              "  else console.warn('skillId_00-foundation not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "07. skill: handoff-guardrails",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use to decide when to stop and pass the conversation to a human, and how to hand it over cleanly.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"handoff-guardrails\",\n  \"description\": \"Use to decide when to stop and pass the conversation to a human, and how to hand it over cleanly.\",\n  \"skill\": \"# Handoff - when to stop, and how\\n\\nAPPLIES whenever you are deciding whether to continue or pass to a person.\\nDOES NOT APPLY as a first action on any message - always try the relevant stage skill\\nfirst.\\n\\n## Hand off immediately, without trying anything else\\n- Anything involving safety: a swelling battery, smoke, fire, a device that burned\\n  someone.\\n- Legal threats, consumer-protection complaints, chargeback disputes, data-deletion\\n  demands.\\n- A customer who is distressed, abusive, or asks for a person more than once.\\n- Fraud claims - an order they say they did not place.\\n\\n## Hand off after gathering, not before\\n- Warranty and RMA (see that skill) - collect order, item and fault first.\\n- Nota fiscal changes, corporate/CNPJ invoicing, bulk quotes.\\n- A partial cancellation, or a refund of an order that already shipped.\\n\\n## Do not hand off for these\\n- A single tool failure. Retry once first.\\n- A product you do not stock. Say só and offer the nearest thing.\\n- A question answered in FAQ or business info. Answer it.\\n- A price the customer thinks is wrong. Read the price from the tool and state it.\\n\\n## How to hand off\\n1. Say you are bringing in a colleague, in one sentence. Never say \\\"transferring you\\\"\\n   and then keep answering.\\n2. Summarise what you already know: the order number if there is one, the item, and\\n   the ask. The customer must not have to repeat themselves.\\n3. Stop replying. Do not add a closing question, and do not keep the sales thread\\n   alive while waiting.\\n\\n## Rules\\n- Never promise a response time you were not given.\\n- Never say a human is \\\"unavailable right now\\\" unless business info says the hours\\n  and it is outside them - in that case say the hours.\\n- Once handed off, you are out of the conversation until control is returned to you.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_01-handoff-guardrails', v); console.log('skillId_01-handoff-guardrails =', v); }",
+              "  else console.warn('skillId_01-handoff-guardrails not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "08. skill: capability-disclaimer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use when the customer asks for something outside what the tools can do, or asks whether they are talking to a person.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"capability-disclaimer\",\n  \"description\": \"Use when the customer asks for something outside what the tools can do, or asks whether they are talking to a person.\",\n  \"skill\": \"# Capability boundaries - say what you can do, in one line\\n\\nAPPLIES when the customer asks for an action you have no tool for, or asks who or\\nwhat you are.\\nDOES NOT APPLY to anything the tools cover - do the work instead of describing it.\\n\\n## What you can actually do\\n**Whatever your registered tools cover, and nothing else.** For the full store that\\nis: search the catalogue, check stock and prices, build a cart, apply a discount\\ncode, quote delivery, place an order, start a PIX or payment-link payment, and\\nreport order and delivery status.\\n\\nAn agent is often set up in stages, so read this as a ceiling rather than a promise.\\nIf the only tools loaded are catalogue tools, then browsing and prices are what you\\ncan do — say so plainly and hand off for anything past that. Never describe a\\ncapability you have no tool for, even one listed above.\\n\\n## What you cannot do, and what to say\\n- Change or reissue an invoice / tax receipt -> a colleague handles that.\\n- Approve a return, a repair or a replacement -> collect the detail and hand off.\\n- Issue a refund or move money -> hand off.\\n- Change the delivery address after the order was placed -> hand off.\\n- Price-match, negotiate, or create a discount -> you can apply a code the customer\\n  has; you cannot create one.\\n- Give technical support for a device already in use -> hand off.\\n- Anything on another store, another brand's site, or a marketplace -> out of scope.\\n\\n## If asked whether you are human\\nSay plainly that you are an AI assistant for ElecStore, that you can help\\nwith most of the shop, and that you will bring in a person whenever they want one.\\nDo not be coy, do not pretend, and do not over-explain.\\n\\n## Rules\\n- One line for the boundary, one line for the alternative. Never list everything you\\n  cannot do.\\n- Never offer a capability as \\\"maybe\\\" or \\\"vou ver se consigo\\\" when you know you have\\n  no tool for it.\\n- Never invent an escalation channel - an email address or a phone number that is not\\n  in business info.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_02-capability-disclaimer', v); console.log('skillId_02-capability-disclaimer =', v); }",
+              "  else console.warn('skillId_02-capability-disclaimer not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "09. skill: media-handling",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use when the customer sends a photo, video, audio message, document or location instead of text.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"media-handling\",\n  \"description\": \"Use when the customer sends a photo, video, audio message, document or location instead of text.\",\n  \"skill\": \"# Media - acknowledge, extract, never conclude\\n\\nAPPLIES when the inbound message is media rather than text.\\nDOES NOT APPLY to text that merely mentions a photo.\\n\\n## By type\\n- **Photo of a product** - say what it appears to show and ask them to confirm the\\n  model in words before you search. Never search on your reading of an image alone,\\n  and never claim to recognise a model number from a photo.\\n- **Photo of a damaged or faulty device** - acknowledge receipt, note in one line\\n  what it appears to show, and follow the warranty-and-rma skill. Do not diagnose.\\n- **Screenshot of an order, a price or a competitor** - read only what is\\n  unambiguous, such as an order number, and verify it with get_order. Never accept a\\n  price from a screenshot.\\n- **Voice message** - respond to the content in text. If it is unclear, ask one\\n  specific question rather than asking them to record again.\\n- **Document (PDF, invoice, tax receipt)** — acknowledge, extract the order number\\n  if visible,\\n  verify with get_order, and hand off if the request is about the document itself.\\n- **Location pin** - use it only to confirm the delivery city. Still ask for the full\\n  address in text; a pin is not a street and number for a courier.\\n\\n## Rules\\n- Never say you cannot see the image. Acknowledge it, then work with what is certain.\\n- Never make a warranty, fault or authenticity determination from media.\\n- Never quote a price or a spec read off an image.\\n- Always confirm in words before acting: \\\"So confirmando - e o Notebook 14 polegadas,\\n  certo?\\\"\\n- If the media is unrelated, abusive, or clearly not about the store, do not describe\\n  it. Ask what they need help with, and hand off if it continues.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_03-media-handling', v); console.log('skillId_03-media-handling =', v); }",
+              "  else console.warn('skillId_03-media-handling not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "10. connector",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors"
+          ]
+        },
+        "description": "Captures `CONNECTOR_ID`.\n\n- `auth_config` is a **JSON object**, not a JSON-encoded string. This is the most common 400 on this endpoint.\n- `auth_type` is one of `API_KEY`, `OAUTH2_CLIENT_CREDENTIALS`, `NONE`. `API_KEY` may be combined with mTLS; OAuth may not.\n- `name` becomes part of the tool name the agent sees, so keep it short and descriptive. Hyphens become underscores.\n- If this fails with no connector id at all, check the connector provisioning prerequisite before anything else.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"elecstore\",\n  \"description\": \"ElecStore electronics store. Product catalogue, prices, variants and stock availability.\\n\",\n  \"base_url\": \"{{SHOP_API}}\",\n  \"auth_type\": \"API_KEY\",\n  \"requires_certificate\": false,\n  \"auth_config\": {\n    \"api_key\": {\n      \"headers\": [\n        {\n          \"field_name\": \"X-API-Key\",\n          \"value\": \"{{SHOP_API_KEY}}\",\n          \"prefix\": \"\"\n        }\n      ]\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('CONNECTOR_ID', v); console.log('CONNECTOR_ID =', v); }",
+              "  else console.warn('CONNECTOR_ID not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "11. tool: search_products",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors/{{CONNECTOR_ID}}/tools",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors",
+            "{{CONNECTOR_ID}}",
+            "tools"
+          ]
+        },
+        "description": "`GET /v1/products` on the store API.\n\nSearch the ElecStore catalogue. Use this whenever the customer asks what is available, names a device, or asks about price. Each result includes variants with their own id, price_cents and stock — in this catalogue the variant is what carries the colour, the storage and the memory, and each variant has its own price. You must pass a VARIANT id (not the product id) to add_cart_item. Prefer limit=3 so the reply stays readable in chat.\n\nReminders that cost a debugging session:\n- Never declare `X-API-Key` as a tool header — the connector injects it, and declaring it again exposes the key to the agent as an input.\n- Every `{placeholder}` in `path` needs exactly one matching key in `path_parameters`.\n- Top-level input names must be unique across path, query, header and body.\n- Nested object properties and array items are **JSON-string-wrapped**; top-level fields are plain objects.\n- A field with a `binding` of `macro` is filled by the runtime and stripped from what the agent sees, so the model cannot hallucinate the phone number.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"search_products\",\n  \"description\": \"Search the ElecStore catalogue. Use this whenever the customer asks what is available, names a device, or asks about price. Each result includes variants with their own id, price_cents and stock — in this catalogue the variant is what carries the colour, the storage and the memory, and each variant has its own price. You must pass a VARIANT id (not the product id) to add_cart_item. Prefer limit=3 so the reply stays readable in chat.\",\n  \"request_definition\": {\n    \"method\": \"GET\",\n    \"path\": \"/v1/products\",\n    \"path_parameters\": {},\n    \"query_parameters\": {\n      \"q\": {\n        \"type\": \"string\",\n        \"description\": \"Free-text search over product title, description and SKU. Accent-insensitive.\",\n        \"required\": false\n      },\n      \"category\": {\n        \"type\": \"string\",\n        \"description\": \"Category slug or id to restrict results to. Use list_categories to discover valid values.\",\n        \"required\": false\n      },\n      \"in_stock\": {\n        \"type\": \"string\",\n        \"description\": \"Set to \\\"true\\\" to return only products with at least one variant in stock.\",\n        \"required\": false\n      },\n      \"limit\": {\n        \"type\": \"integer\",\n        \"description\": \"Maximum products to return. Keep small (3-5) for chat, since long lists are hard to read on WhatsApp.\",\n        \"required\": false\n      },\n      \"min_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Lowest acceptable price in cents (50.00 is 5000). Use when the customer sets a budget floor.\",\n        \"required\": false\n      },\n      \"max_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Highest acceptable price in cents (100.00 is 10000). Use when the customer says \\\"under 100\\\" or similar.\",\n        \"required\": false\n      }\n    },\n    \"headers\": {},\n    \"body\": null\n  },\n  \"user_auth_required\": false,\n  \"user_auth_action_config\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('toolId_search_products', v); console.log('toolId_search_products =', v); }",
+              "  else console.warn('toolId_search_products not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "12. tool: get_product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors/{{CONNECTOR_ID}}/tools",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors",
+            "{{CONNECTOR_ID}}",
+            "tools"
+          ]
+        },
+        "description": "`GET /v1/products/{product_id}` on the store API.\n\nFetch one product with all of its variants. Use when the customer asks about colour, storage size, memory, or whether a specific configuration is in stock — those live on the variants, not the product. Also use before comparing two devices: never state a specification this response does not contain.\n\nReminders that cost a debugging session:\n- Never declare `X-API-Key` as a tool header — the connector injects it, and declaring it again exposes the key to the agent as an input.\n- Every `{placeholder}` in `path` needs exactly one matching key in `path_parameters`.\n- Top-level input names must be unique across path, query, header and body.\n- Nested object properties and array items are **JSON-string-wrapped**; top-level fields are plain objects.\n- A field with a `binding` of `macro` is filled by the runtime and stripped from what the agent sees, so the model cannot hallucinate the phone number.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"get_product\",\n  \"description\": \"Fetch one product with all of its variants. Use when the customer asks about colour, storage size, memory, or whether a specific configuration is in stock — those live on the variants, not the product. Also use before comparing two devices: never state a specification this response does not contain.\",\n  \"request_definition\": {\n    \"method\": \"GET\",\n    \"path\": \"/v1/products/{product_id}\",\n    \"path_parameters\": {\n      \"product_id\": {\n        \"type\": \"string\",\n        \"description\": \"Product id returned by search_products, e.g. prod_1a2b3c.\"\n      }\n    },\n    \"query_parameters\": {},\n    \"headers\": {},\n    \"body\": null\n  },\n  \"user_auth_required\": false,\n  \"user_auth_action_config\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('toolId_get_product', v); console.log('toolId_get_product =', v); }",
+              "  else console.warn('toolId_get_product not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "13. tool: list_categories",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors/{{CONNECTOR_ID}}/tools",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors",
+            "{{CONNECTOR_ID}}",
+            "tools"
+          ]
+        },
+        "description": "`GET /v1/categories` on the store API.\n\nList the store's product categories with a count of products in each. Use when the customer asks what kinds of things the store sells, or to browse rather than search.\n\nReminders that cost a debugging session:\n- Never declare `X-API-Key` as a tool header — the connector injects it, and declaring it again exposes the key to the agent as an input.\n- Every `{placeholder}` in `path` needs exactly one matching key in `path_parameters`.\n- Top-level input names must be unique across path, query, header and body.\n- Nested object properties and array items are **JSON-string-wrapped**; top-level fields are plain objects.\n- A field with a `binding` of `macro` is filled by the runtime and stripped from what the agent sees, so the model cannot hallucinate the phone number.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"list_categories\",\n  \"description\": \"List the store's product categories with a count of products in each. Use when the customer asks what kinds of things the store sells, or to browse rather than search.\",\n  \"request_definition\": {\n    \"method\": \"GET\",\n    \"path\": \"/v1/categories\",\n    \"path_parameters\": {},\n    \"query_parameters\": {},\n    \"headers\": {},\n    \"body\": null\n  },\n  \"user_auth_required\": false,\n  \"user_auth_action_config\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('toolId_list_categories', v); console.log('toolId_list_categories =', v); }",
+              "  else console.warn('toolId_list_categories not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "14. skill: discovery",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use when the customer is looking for a device and has no cart yet - asking what the store sells, naming a product, asking a price, giving a budget, or browsing categories.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"discovery\",\n  \"description\": \"Use when the customer is looking for a device and has no cart yet - asking what the store sells, naming a product, asking a price, giving a budget, or browsing categories.\",\n  \"skill\": \"# Stage 1 - Product discovery\\n\\nAPPLIES when the customer is looking for something and has no cart yet: asking what\\nyou sell, naming a product, asking a price, giving a budget, or browsing.\\nDOES NOT APPLY once a cart exists - the cart skill owns the conversation from then on.\\n\\n## Steps\\n1. If they named or described a product, call search_products with `q` set to their\\n   words and `limit=3`. Do not pass the whole sentence - pass the product words.\\n   \\\"I want cheap bluetooth headphones\\\" -> `q=bluetooth headphones`.\\n   If they gave a budget — \\\"under 500\\\", \\\"nothing over a thousand\\\" — pass it as\\n   `max_price` in cents (500 is 50000), rather than filtering the results\\n   yourself after the fact. `min_price` works the same way.\\n2. If they are browsing with no specific item in mind, call list_categories and offer\\n   at most 4 of whatever it returns. Read the category names from the response —\\n   never assume them, and use them exactly as returned when you pass `category`.\\n3. Present at most 3 results, one line each: product name, price, and one short\\n   reason it fits what they asked for. Then ask a single narrowing question -\\n   for electronics the useful narrowing questions are budget, storage/memory size,\\n   colour, and what they will use it for.\\n4. If they ask about colours, storage, memory or whether something is in stock, call\\n   get_product for that product and answer from its variants.\\n\\n## Rules\\n- Search returns products; each has a `variants` array. Colour, storage, memory and\\n  stock live on the variants, not the product. Read stock from the variant.\\n- If `in_stock` is false for every variant, say it is out of stock and offer the\\n  closest alternative from the same category. Never imply it can be ordered anyway.\\n- If search returns nothing, do not apologise twice. Try once more with a broader term\\n  (drop adjectives, use the category word - \\\"notebook\\\" instead of \\\"notebook gamer\\n  barato\\\"), then offer to show the category instead.\\n- Do not list more than 3 items even if asked \\\"what do you have?\\\" — offer a category\\n  and let them narrow.\\n- Do not start a cart yet. Only create a cart when the customer says they want an item.\\n\\n## Handover to the next stage\\nThe moment the customer says they want an item — \\\"I will take it\\\", \\\"add that one\\\",\\n\\\"the black one works\\\" — stop discovery and follow the cart skill.\\n\\nIf this agent has no cart skill and no cart tools loaded, do **not** improvise an\\norder in text. Say you will pass them to a colleague to finish the purchase, and\\nfollow the handoff-guardrails skill.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_00-discovery', v); console.log('skillId_00-discovery =', v); }",
+              "  else console.warn('skillId_00-discovery not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "15. skill: rich-ui-carousel",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use whenever product results are being shown to the customer, to render them as a WhatsApp carousel rather than a plain-text list.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"rich-ui-carousel\",\n  \"description\": \"Use whenever product results are being shown to the customer, to render them as a WhatsApp carousel rather than a plain-text list.\",\n  \"skill\": \"# Rich UI - render product results as a carousel\\n\\nAPPLIES to the moment you present product results, in any stage.\\nDOES NOT APPLY to clarifying questions, acknowledgements, or any message that is not\\na set of products.\\n\\n## What to render\\n- **Product results must render as a carousel**, never as a plain-text list. Each\\n  card carries the product image, the title, the price, and a button.\\n- Images come from the store: every product has a 300x300 PNG at\\n  `/v1/images/<SKU>.png` on the store's own domain, no authentication needed. Use the\\n  SKU from the product or variant you are showing.\\n- At most 3 cards. More is unreadable on a phone and slows the reply.\\n- The button on each card should carry the action the customer would take next -\\n  \\\"Add\\\" for an in-stock item, \\\"See details\\\" when they still need to choose a\\n  variant.\\n\\n## Rules\\n- One interactive component per message. Never combine a carousel with quick-reply\\n  pills in the same turn.\\n- Do not skip the clarifying question just to get to a carousel faster. Ask the\\n  narrowing question in text first, then render the narrowed results.\\n- Everything that is not a product list stays as text: refinements, confirmations,\\n  the address question, the PIX code.\\n- Never render a card for a product whose every variant is out of stock.\\n- If the carousel cannot be rendered on this number, fall back to at most 3 lines of\\n  text - name, price, one reason - and carry on. Never block the conversation waiting\\n  for a UI component.\\n\\n## Rules that come from real failures\\n- **Never invent a card.** Product ids, titles, prices and image URLs come from a\\n  `search_products` or `get_product` response in this conversation. If search returned\\n  nothing, do not render a carousel at all — say so in text and offer a category.\\n- **If you cannot fill a required field, skip the component.** Do not substitute a\\n  plausible value. A fabricated image URL is worse than no carousel.\\n- **Never say \\\"above\\\" or \\\"below\\\".** The carousel is sent as a separate message *after*\\n  your text, so it lands underneath. Say \\\"here are some options\\\" and let them look.\\n- **Do not repeat the cards in your text.** The carousel already lists the products\\n  with their prices. Your message is one short line of context, not a second copy of\\n  the list.\\n- **One interactive component per turn**, and never a carousel plus a list.\\n\\n## Catalogue-backed carousels\\nIf this WhatsApp number has a Meta catalogue linked, prefer hydrating the carousel\\nfrom that catalogue só the cards carry catalogue product ids the customer can tap\\nthrough. Fall back to connector data when the item is not in the catalogue.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_01-rich-ui-carousel', v); console.log('skillId_01-rich-ui-carousel =', v); }",
+              "  else console.warn('skillId_01-rich-ui-carousel not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "16. skill: quick-reply-pills",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Use when offering the customer a small fixed set of choices, to present them as tappable quick-reply pills instead of asking them to type.\n\n`title`, `description` and `skill` are all required. The **description is what the agent matches on** to decide the skill is relevant — a skill created without one can never be selected.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"quick-reply-pills\",\n  \"description\": \"Use when offering the customer a small fixed set of choices, to present them as tappable quick-reply pills instead of asking them to type.\",\n  \"skill\": \"# Quick-reply pills - present options as tappable choices\\n\\nAPPLIES when you are about to offer 2 to 4 discrete choices.\\nDOES NOT APPLY when the answer is open-ended (an address, a description of a fault,\\na product name), and not in the same message as a carousel.\\n\\n## When to use pills\\n- **Clarifying questions with a fixed set of answers** — category, storage size,\\n  colour, budget band, yes/no confirmations. Use the category names exactly as\\n  `list_categories` returned them; do not translate or tidy them.\\n- **Next-step choices** after an answer — \\\"Add to cart\\\", \\\"See similar\\\",\\n  \\\"Talk to a person\\\".\\n- **Disambiguation** - when the request maps to a few known options.\\n\\n## Rules\\n- **Only 2 to 4 pills** per message; keep each label to a few words. If there are\\n  more than about 4 options, use a carousel or ask an open question instead.\\n- Pills are for discrete choices, not free-form input.\\n- **Every pill must map to an action you can actually take.** Never offer a pill for\\n  a capability you do not have - see the capability-disclaimer skill.\\n- One interactive component per turn.\\n- For product results, prefer the carousel; use pills for the follow-up choice.\\n\\n## What \\\"pills\\\" actually means on WhatsApp\\nThere are two tappable surfaces, and which you get depends on how many options there\\nare:\\n- **2–3 options** — the buttons on carousel cards, or standalone quick-reply pills\\n  where the number supports them. Three is the hard ceiling.\\n- **4 or more** — an interactive list. Do not try to squeeze five choices into pills.\\n\\nNever offer a tappable choice for something the tools cannot do, and never send a list\\nand a carousel in the same turn.\\n\\n## Fallback\\nIf quick-reply pills are not available on this number, present the same options as a\\nshort numbered text list and accept the customer's typed choice. Never block the flow\\nwaiting for a pill.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('skillId_02-quick-reply-pills', v); console.log('skillId_02-quick-reply-pills =', v); }",
+              "  else console.warn('skillId_02-quick-reply-pills not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "17. ui-skill: carousel_quick_reply",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent-ui-skills",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent-ui-skills"
+          ]
+        },
+        "description": "This is what actually makes a carousel appear. The `rich-ui-carousel` skill governs *how* to use it; this registers the component and its trigger.\n\n## Four rules baked into the instruction above\n\nEach one prevents a specific way the carousel goes wrong:\n\n- **\"Product ids MUST come from search_products. NEVER fabricate.\"** Without this the agent will make an id up when a search returns nothing, or reuse an id from a different source that the catalogue does not recognise.\n- **\"If search returned no results, do NOT trigger.\"** When a required field cannot be filled from a tool response, the conversation, or a default, skip the component rather than invent a value for it — a fabricated image URL is worse than no carousel.\n- **No \"above\"/\"below\".** The carousel arrives underneath the text, so \"take a look at the options above\" is wrong on screen.\n- **No dynamic body text.** The message and the carousel are two separate WhatsApp messages. If both list the products, the customer reads it twice. Keep the card text short and fixed, and let the message carry the conversation.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"product-carousel\",\n  \"component_type\": \"carousel_quick_reply\",\n  \"status\": \"enabled\",\n  \"instruction\": \"When you have product results to show, render them as a carousel with quick-reply buttons instead of a text list. One card per product, at most 3 cards. Each card uses the product title, its price exactly as search_products returned it, the image at {{SHOP_API}}/v1/images/<SKU>.png for that product SKU, and a button labelled \\\"Add\\\" when a variant is in stock or \\\"See details\\\" when the customer still has to choose a colour or storage size. Product ids and prices MUST come from a search_products or get_product response in this conversation. NEVER fabricate a product id, a price or an image URL. If search_products returned no results, do NOT trigger this carousel. Do not render a card for a product whose every variant is out of stock. Do not refer to the cards as being \\\"above\\\" or \\\"below\\\" — say \\\"here are some options\\\" instead.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('uiSkillId_carousel', v); console.log('uiSkillId_carousel =', v); }",
+              "  else console.warn('uiSkillId_carousel not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "18. ui-skill: interactive_list",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent-ui-skills",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent-ui-skills"
+          ]
+        },
+        "description": "The list is the pill surface with room for more than a handful of options.\n\n**On quick-reply pills specifically:** WhatsApp's standalone pill component (`SHOW_QUICK_REPLY_PILLS`) is capped at **3 pills** and is not exposed as a public `component_type` on this endpoint — the public enum is `cta_url`, `image`, `interactive_list`, `location`, `location_request`, `carousel_quick_reply`, `carousel_url` and `flow`. So in practice you get tappable choices two ways: the buttons on `carousel_quick_reply` cards (7.5), and `interactive_list` (here). The `quick-reply-pills` skill covers the discipline for both, and its text fallback covers a number where neither renders.\n\nOne interactive component per turn. Two in one message is the fastest way to make a thread unreadable on a phone.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"browse-categories\",\n  \"component_type\": \"interactive_list\",\n  \"status\": \"enabled\",\n  \"instruction\": \"When the customer is browsing with no specific product in mind, or when you need them to pick from more than three options, show an interactive list instead of asking them to type. Use it for choosing a category, a storage size or a colour. Take the options from list_categories or from the variants get_product returned — never invent an option, and never offer one that is out of stock. Keep it to a single question per list, and do not send a list and a carousel in the same turn.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
+              "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
+              "  if (v) { setVar('uiSkillId_list', v); console.log('uiSkillId_list =', v); }",
+              "  else console.warn('uiSkillId_list not found in response — set it by hand');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "19. allowlist",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/allowlist",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "allowlist"
+          ]
+        },
+        "description": "With `ai_audience: ALLOWLISTED_ONLY`, this is the list of consumers the agent will answer. Add every phone that will be used in the demo — including the presenter's. E.164, with the leading `+`.\n\nA number that is not on the list gets **silence**, which looks identical to a broken agent. This is the most common self-inflicted wound in a workshop room.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"consumer_phone_number\": \"{{CONSUMER_PHONE}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "20. settings: FINAL rollout=true",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/settings?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "settings"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "A partial PUT: only `rollout` changes, so the allowlist and handoff message set at `settings: rollout=false + allowlist only` stay. `ai_audience` is still `ALLOWLISTED_ONLY`, so only the numbers from 2.4 reach the agent. Widen to `EVERYONE` when you are ready, not before.\n\nNow message the number from your phone: *\"hi, I want bluetooth headphones under 300\"*. You should get a carousel of three, with pills to narrow.\n\nThen try *\"I want to buy it\"* — the agent should hand off rather than improvise an order it has no tools for. That refusal is what the behaviour skills bought you, and it is worth pointing at explicitly.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rollout\": {\n    \"enabled\": true\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "21. thread_control: release",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/business/whatsapp/phone_numbers/{{ENTITY_ID}}/thread_control",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "business",
+            "whatsapp",
+            "phone_numbers",
+            "{{ENTITY_ID}}",
+            "thread_control"
+          ]
+        },
+        "description": "Mutes the agent for this consumer so a human inbox can answer. The customer sees nothing change; the next reply simply comes from a person.\n\n**Note the host and the path.** Thread control is not a Graph edge: `graph.facebook.com/v23.0/{id}/thread_control` is not an edge on the Graph host, and calling it there returns `Unknown path components: /thread_control` rather than a permissions error. Verified against the live hosts while this collection was written.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"release\",\n  \"to\": \"{{CONSUMER_PHONE}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "22. thread_control: take",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/business/whatsapp/phone_numbers/{{ENTITY_ID}}/thread_control",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "business",
+            "whatsapp",
+            "phone_numbers",
+            "{{ENTITY_ID}}",
+            "thread_control"
+          ]
+        },
+        "description": "Un-mutes the agent for this consumer so it resumes owning the conversation. Without this, `thread_control: release` is one-way, and a room that ran it during the demo will spend the rest of the session wondering why the agent went quiet.\n\nConfirm the action vocabulary against the current Thread Control reference before you build on it — the verbs are the part most likely to move.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"take\",\n  \"to\": \"{{CONSUMER_PHONE}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A1. store: health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{SHOP_API}}/healthz",
+          "host": [
+            "{{SHOP_API}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        },
+        "description": "Liveness and version. No API key needed. If this fails, nothing below will work."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A2. store: products",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{SHOP_API_KEY}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{SHOP_API}}/v1/products?limit=3&in_stock=true",
+          "host": [
+            "{{SHOP_API}}"
+          ],
+          "path": [
+            "v1",
+            "products"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "3"
+            },
+            {
+              "key": "in_stock",
+              "value": "true"
+            }
+          ]
+        },
+        "description": "The electronics catalogue for your tenant. A 401 here means `SHOP_API_KEY` is wrong — fix it now, because the connector will carry the same value.\n\nNote the shape: each product has a `variants` array, and the **variant** is what carries colour, storage and its own price. That distinction is the single most common source of failed agent tool calls, and the `discovery` skill spends three lines on it."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
+              "const setVar = (k, v) => {",
+              "  pm.collectionVariables.set(k, v);",
+              "  if (pm.environment.name) pm.environment.set(k, v);",
+              "};",
+              "if (ok) {",
+              "  const p = pm.response.json().data?.[0];",
+              "  if (p) { setVar('SAMPLE_PRODUCT_ID', p.id);",
+              "    if (p.variants?.[0]) setVar('SAMPLE_VARIANT_ID', p.variants[0].id); }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A3. settings: read",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/settings?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "settings"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Confirm the agent exists and see the defaults before you change them. Worth doing rather than assuming: this is also how you check `rollout` and `ai_audience` after any later change, and it is the cheapest way to prove your token actually resolves this entity."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A4. faq: list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/faq",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "faq"
+          ]
+        },
+        "description": "Two records. Worth running: re-posting the same question leaves two copies of it, and duplicated knowledge produces the same inconsistent answers that duplicated skills do. **List before you create** is the habit to build here, because it is the same habit stages 4 and 7 need for skills."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A5. skill: list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "2.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_config",
+            "skills"
+          ],
+          "query": [
+            {
+              "key": "agent_id",
+              "value": "{{AGENT_ID}}"
+            }
+          ]
+        },
+        "description": "Empty on a fresh agent. Run it anyway — creating a skill that already exists leaves two copies, which is the duplicated-instruction problem in a different form. Also `GET /{skill_id}`, `PUT /{skill_id}`, `DELETE /{skill_id}`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A6. connector: list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors"
+          ]
+        },
+        "description": "Everything wired to this phone number, and the fastest way to spot the classic workshop mess: three connectors created by three people on the same number, two of them pointing at a stale key. Delete the spares (Advanced 4.x) before debugging anything else."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A7. tool: list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent_connectors/{{CONNECTOR_ID}}/tools",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent_connectors",
+            "{{CONNECTOR_ID}}",
+            "tools"
+          ]
+        },
+        "description": "Three tools. This is also where you read the exact tool names the agent sees, which is what you need if a skill ever fails to resolve a bare tool name."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "A8. ui-skill: list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Version",
+            "value": "1.0.0"
+          }
+        ],
+        "url": {
+          "raw": "{{API}}/{{ENTITY_ID}}/agent-ui-skills",
+          "host": [
+            "{{API}}"
+          ],
+          "path": [
+            "{{ENTITY_ID}}",
+            "agent-ui-skills"
+          ]
+        },
+        "description": "A different resource from `/agent_config/skills`. A **UI skill** registers an interactive WhatsApp component and the instruction that decides when the agent triggers it. A regular skill is text guidance only and cannot make a carousel render.\n\nEach record is `{ id, title, component_type, status, instruction }`, plus `flow_id` for the `flow` type. Component types: `carousel_quick_reply`, `carousel_url`, `interactive_list`, `cta_url`, `image`, `location`, `location_request`, `flow`.\n\nEmpty on a fresh agent — the two below fill it."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
+              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "API",
+      "value": "https://api.facebook.com"
+    },
+    {
+      "key": "GRAPH",
+      "value": "https://graph.facebook.com/v23.0"
+    },
+    {
+      "key": "ENTITY_ID",
+      "value": ""
+    },
+    {
+      "key": "WABA_ID",
+      "value": ""
+    },
+    {
+      "key": "MBA_ACCESS_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "AGENT_ID",
+      "value": ""
+    },
+    {
+      "key": "CONNECTOR_ID",
+      "value": ""
+    },
+    {
+      "key": "SHOP_API",
+      "value": "https://mockecommerceapi.vercel.app"
+    },
+    {
+      "key": "SHOP_API_KEY",
+      "value": "demo-store_1"
+    },
+    {
+      "key": "CONSUMER_PHONE",
+      "value": ""
+    },
+    {
+      "key": "CONSUMER_PHONE_DIGITS",
+      "value": ""
+    },
+    {
+      "key": "SUPPORT_PHONE",
+      "value": ""
+    }
+  ]
+}
