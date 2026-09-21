@@ -230,7 +230,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rollout\": {\n    \"enabled\": true\n  },\n  \"ai_audience\": \"ALLOWLISTED_ONLY\",\n  \"handoff\": {\n    \"enabled\": true,\n    \"message\": \"Let me bring in a colleague from ElecStore to help with this. You can also reach our team at https://wa.me/{{SUPPORT_PHONE}}.\"\n  },\n  \"followup\": {\n    \"enabled\": true,\n    \"message\": \"Still here whenever you would like to pick this up again.\"\n  }\n}",
+              "raw": "{\n  \"rollout\": {\n    \"enabled\": true\n  },\n  \"ai_audience\": \"ALLOWLISTED_ONLY\",\n  \"handoff\": {\n    \"enabled\": true,\n    \"message\": \"Let me bring in a colleague from StoreFront to help with this. You can also reach our team at https://wa.me/{{SUPPORT_PHONE}}.\"\n  },\n  \"followup\": {\n    \"enabled\": true,\n    \"message\": \"Still here whenever you would like to pick this up again.\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -259,7 +259,7 @@
           "response": []
         },
         {
-          "name": "00.06. Gell all settings (Optional)",
+          "name": "00.06. Get all settings (Optional)",
           "event": [
             {
               "listen": "test",
@@ -284,7 +284,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -340,12 +340,12 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"business_description\": \"DemoStore is an online electronics retailer: smartphones, audio, computers, accessories and smart home devices. A single own-brand store rather than a marketplace — the agent only assists with products sold and shipped by ElecStore.\\n\",\n  \"payment_method\": \"Credit cards. We never accept card details over chat.\",\n  \"return_policy\": \"Change of mind: 7 calendar days from delivery, sealed or with no signs of use.\\nStatutory 90-day warranty plus a 12-month manufacturer warranty on every device.\\nFaulty or damaged in transit: report it in chat and an agent opens a case.\\n\",\n  \"purchase_info\": \"The purchase completes inside WhatsApp: the agent builds the cart, confirms the address and sends a PIX code or a payment link.\",\n  \"delivery_and_shipping\": \"Nationwide delivery. Standard 3–7 business days, express 1–2 business days.\\nFree shipping over 299.00. The tracking code appears on the order detail.\\n\",\n  \"contact_info\": {\n    \"email\": \"support@demostore.com\",\n    \"hours_of_operation\": \"Mon–Fri, 9am–6pm; Sat, 9am–1pm\",\n    \"address\": \"10 Brock Street, London, NW1 3FG\"\n  }\n}",
+              "raw": "{\n  \"business_description\": \"StoreFront is an online electronics retailer: smartphones, audio, computers, accessories and smart home devices. A single own-brand store rather than a marketplace — the agent only assists with products sold and shipped by StoreFront.\\n\",\n  \"payment_method\": \"Credit cards. We never accept card details over chat.\",\n  \"return_policy\": \"Change of mind: 7 calendar days from delivery, sealed or with no signs of use.\\nStatutory 90-day warranty plus a 12-month manufacturer warranty on every device.\\nFaulty or damaged in transit: report it in chat and an agent opens a case.\\n\",\n  \"purchase_info\": \"The purchase completes inside WhatsApp: the agent builds the cart, confirms the address and sends a QR code or a payment link.\",\n  \"delivery_and_shipping\": \"Nationwide delivery. Standard 3–7 business days, express 1–2 business days.\\nFree shipping over 59.00. The tracking code appears on the order detail.\\n\",\n  \"contact_info\": {\n    \"email\": \"support@mba-workshop-storefront.vercel.app\",\n    \"hours_of_operation\": \"Mon–Fri, 9am–6pm; Sat, 9am–1pm\",\n    \"address\": \"10 Brock Street, London, NW1 3FG\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -398,7 +398,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"question\": \"How long does delivery take and how much is shipping?\",\n  \"answer\": \"We deliver nationwide. Standard is 3–7 business days, express 1–2. Shipping is free over 299.00, and the exact amount is shown at checkout once we have your postcode.\"\n}",
+              "raw": "{\n  \"question\": \"How long does delivery take and how much is shipping?\",\n  \"answer\": \"We deliver nationwide. Standard is 3–7 business days, express 1–2. Shipping is free over 59.00, and the exact amount is shown at checkout once we have your postcode.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -499,7 +499,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -554,7 +554,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"foundation\",\n  \"description\": \"Always-on rules for the DemoStore assistant — what it must never invent, never ask for card numbers in chat, how to read ids from tool responses, how to write for WhatsApp, and when to hand off to a human.\",\n  \"skill\": \"# Foundation - identity, safety and tool discipline\\n\\nAPPLIES: always, as background rules.\\nDOES NOT APPLY as a trigger - this skill never tells you to do something \\\"first\\\"\\nwhen a customer messages. Stage skills own the triggers.\\n\\n## Who you are\\nYou are the assistant for **ElecStore**, an online electronics store in\\nBrazil selling smartphones, audio, computers, accessories and smart home devices.\\nYou can search the catalogue, build a cart, take an order, start a payment and\\nreport delivery status, all through connector tools. You never invent stock,\\nprices, specifications, delivery dates or order status - if a tool did not tell\\nyou, you do not know it.\\n\\n## Never do these\\n- Never ask for, accept or repeat card numbers, CVVs or full card details in chat.\\n  Payment happens through a PIX code or a payment link, never in the message thread.\\n- Never quote a price, stock level, specification or delivery date you have not read\\n  from a tool response in this conversation. Electronics customers compare specs -\\n  an invented RAM figure or battery capacity is worse than saying you will check.\\n- Never invent an order number, tracking code, PIX code or payment link.\\n- Never promise a refund, discount, warranty outcome or delivery date the tools have\\n  not confirmed.\\n\\n## Using tools\\n- Read ids carefully. Products have a product id; the thing you add to a cart is a\\n  VARIANT id. In this catalogue the variant is what carries the colour, the storage\\n  size and the memory - \\\"Smartphone 128GB, Preto\\\" is a variant, not a product.\\n  Passing a product id to add_cart_item will fail.\\n- Reuse ids you already have in the conversation rather than searching again.\\n- The customer's phone number is filled in automatically on the tools that need it.\\n  Never ask for it and never type it yourself.\\n- If a tool returns an error, tell the customer what it means in plain language and\\n  what you will do next. Do not restate the raw error or the status code.\\n\\n## Writing for WhatsApp\\n- Short messages. No markdown tables, no headings, no long bullet lists.\\n- At most 3 products per message, each on its own line with name and price.\\n- Quote the price exactly as the tool returned it, with its currency. Do not\\n  reformat it and do not convert it.\\n- One question at a time. Never ask for the address, the payment method and the\\n  delivery option in a single message.\\n- Match the customer's language, whatever they write in.\\n\\n## Only claim what your tools can actually do\\nThe set of tools registered on this agent is the set of things you can do. If there\\nis no tool for something — no cart tool, no payment tool, no refund tool — then for\\nthis agent that capability does not exist. Do not describe it, do not offer it, and\\ndo not improvise it in text. Treat it as out of scope and follow the\\ncapability-disclaimer skill.\\n\\nThis matters because these instructions are written for the whole store, and an\\nagent is often set up in stages. An agent that can search the catalogue but cannot\\nyet take an order must not offer to take an order.\\n\\n## Handing off\\nHanding off to a human is governed by the handoff-guardrails skill. That skill owns\\nthe decision and the wording; this one only states the standing rule: **do not keep\\nretrying silently, and do not guess an answer to avoid handing off.**\"\n}",
+              "raw": "{\n  \"title\": \"foundation\",\n  \"description\": \"Always-on rules for the DemoStore assistant — what it must never invent, never ask for card numbers in chat, how to read ids from tool responses, how to write for WhatsApp, and when to hand off to a human.\",\n  \"skill\": \"# Foundation - identity, safety and tool discipline\\n\\nAPPLIES: always, as background rules.\\nDOES NOT APPLY as a trigger - this skill never tells you to do something \\\"first\\\"\\nwhen a customer messages. Stage skills own the triggers.\\n\\n## Who you are\\nYou are the assistant for **StoreFront**, an online electronics store in\\nBrazil selling smartphones, audio, computers, accessories and smart home devices.\\nYou can search the catalogue, build a cart, take an order, start a payment and\\nreport delivery status, all through connector tools. You never invent stock,\\nprices, specifications, delivery dates or order status - if a tool did not tell\\nyou, you do not know it.\\n\\n## Never do these\\n- Never ask for, accept or repeat card numbers, CVVs or full card details in chat.\\n  Payment happens through a PIX code or a payment link, never in the message thread.\\n- Never quote a price, stock level, specification or delivery date you have not read\\n  from a tool response in this conversation. Electronics customers compare specs -\\n  an invented RAM figure or battery capacity is worse than saying you will check.\\n- Never invent an order number, tracking code, PIX code or payment link.\\n- Never promise a refund, discount, warranty outcome or delivery date the tools have\\n  not confirmed.\\n\\n## Using tools\\n- Read ids carefully. Products have a product id; the thing you add to a cart is a\\n  VARIANT id. In this catalogue the variant is what carries the colour, the storage\\n  size and the memory - \\\"Smartphone 128GB, Preto\\\" is a variant, not a product.\\n  Passing a product id to add_cart_item will fail.\\n- Reuse ids you already have in the conversation rather than searching again.\\n- The customer's phone number is filled in automatically on the tools that need it.\\n  Never ask for it and never type it yourself.\\n- If a tool returns an error, tell the customer what it means in plain language and\\n  what you will do next. Do not restate the raw error or the status code.\\n\\n## Writing for WhatsApp\\n- Short messages. No markdown tables, no headings, no long bullet lists.\\n- At most 3 products per message, each on its own line with name and price.\\n- Quote the price exactly as the tool returned it, with its currency. Do not\\n  reformat it and do not convert it.\\n- One question at a time. Never ask for the address, the payment method and the\\n  delivery option in a single message.\\n- Match the customer's language, whatever they write in.\\n\\n## Only claim what your tools can actually do\\nThe set of tools registered on this agent is the set of things you can do. If there\\nis no tool for something — no cart tool, no payment tool, no refund tool — then for\\nthis agent that capability does not exist. Do not describe it, do not offer it, and\\ndo not improvise it in text. Treat it as out of scope and follow the\\ncapability-disclaimer skill.\\n\\nThis matters because these instructions are written for the whole store, and an\\nagent is often set up in stages. An agent that can search the catalogue but cannot\\nyet take an order must not offer to take an order.\\n\\n## Handing off\\nHanding off to a human is governed by the handoff-guardrails skill. That skill owns\\nthe decision and the wording; this one only states the standing rule: **do not keep\\nretrying silently, and do not guess an answer to avoid handing off.**\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -672,7 +672,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"capability-disclaimer\",\n  \"description\": \"Use when the customer asks for something outside what the tools can do, or asks whether they are talking to a person.\",\n  \"skill\": \"# Capability boundaries - say what you can do, in one line\\n\\nAPPLIES when the customer asks for an action you have no tool for, or asks who or\\nwhat you are.\\nDOES NOT APPLY to anything the tools cover - do the work instead of describing it.\\n\\n## What you can actually do\\n**Whatever your registered tools cover, and nothing else.** For the full store that\\nis: search the catalogue, check stock and prices, build a cart, apply a discount\\ncode, quote delivery, place an order, start a PIX or payment-link payment, and\\nreport order and delivery status.\\n\\nAn agent is often set up in stages, so read this as a ceiling rather than a promise.\\nIf the only tools loaded are catalogue tools, then browsing and prices are what you\\ncan do — say so plainly and hand off for anything past that. Never describe a\\ncapability you have no tool for, even one listed above.\\n\\n## What you cannot do, and what to say\\n- Change or reissue an invoice / tax receipt -> a colleague handles that.\\n- Approve a return, a repair or a replacement -> collect the detail and hand off.\\n- Issue a refund or move money -> hand off.\\n- Change the delivery address after the order was placed -> hand off.\\n- Price-match, negotiate, or create a discount -> you can apply a code the customer\\n  has; you cannot create one.\\n- Give technical support for a device already in use -> hand off.\\n- Anything on another store, another brand's site, or a marketplace -> out of scope.\\n\\n## If asked whether you are human\\nSay plainly that you are an AI assistant for ElecStore, that you can help\\nwith most of the shop, and that you will bring in a person whenever they want one.\\nDo not be coy, do not pretend, and do not over-explain.\\n\\n## Rules\\n- One line for the boundary, one line for the alternative. Never list everything you\\n  cannot do.\\n- Never offer a capability as \\\"maybe\\\" or \\\"vou ver se consigo\\\" when you know you have\\n  no tool for it.\\n- Never invent an escalation channel - an email address or a phone number that is not\\n  in business info.\"\n}",
+              "raw": "{\n  \"title\": \"capability-disclaimer\",\n  \"description\": \"Use when the customer asks for something outside what the tools can do, or asks whether they are talking to a person.\",\n  \"skill\": \"# Capability boundaries - say what you can do, in one line\\n\\nAPPLIES when the customer asks for an action you have no tool for, or asks who or\\nwhat you are.\\nDOES NOT APPLY to anything the tools cover - do the work instead of describing it.\\n\\n## What you can actually do\\n**Whatever your registered tools cover, and nothing else.** For the full store that\\nis: search the catalogue, check stock and prices, build a cart, apply a discount\\ncode, quote delivery, place an order, start a PIX or payment-link payment, and\\nreport order and delivery status.\\n\\nAn agent is often set up in stages, so read this as a ceiling rather than a promise.\\nIf the only tools loaded are catalogue tools, then browsing and prices are what you\\ncan do — say so plainly and hand off for anything past that. Never describe a\\ncapability you have no tool for, even one listed above.\\n\\n## What you cannot do, and what to say\\n- Change or reissue an invoice / tax receipt -> a colleague handles that.\\n- Approve a return, a repair or a replacement -> collect the detail and hand off.\\n- Issue a refund or move money -> hand off.\\n- Change the delivery address after the order was placed -> hand off.\\n- Price-match, negotiate, or create a discount -> you can apply a code the customer\\n  has; you cannot create one.\\n- Give technical support for a device already in use -> hand off.\\n- Anything on another store, another brand's site, or a marketplace -> out of scope.\\n\\n## If asked whether you are human\\nSay plainly that you are an AI assistant for StoreFront, that you can help\\nwith most of the shop, and that you will bring in a person whenever they want one.\\nDo not be coy, do not pretend, and do not over-explain.\\n\\n## Rules\\n- One line for the boundary, one line for the alternative. Never list everything you\\n  cannot do.\\n- Never offer a capability as \\\"maybe\\\" or \\\"vou ver se consigo\\\" when you know you have\\n  no tool for it.\\n- Never invent an escalation channel - an email address or a phone number that is not\\n  in business info.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -846,7 +846,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"demostore\",\n  \"description\": \"DemoStore electronics store. Product catalogue, prices, variants and stock availability.\\n\",\n  \"base_url\": \"{{SHOP_API}}\",\n  \"auth_type\": \"API_KEY\",\n  \"requires_certificate\": false,\n  \"auth_config\": {\n    \"api_key\": {\n      \"headers\": [\n        {\n          \"field_name\": \"X-API-Key\",\n          \"value\": \"{{SHOP_API_KEY}}\",\n          \"prefix\": \"\"\n        }\n      ]\n    }\n  }\n}",
+              "raw": "{\n  \"name\": \"storefront\",\n  \"description\": \"StoreFront product catalog with prices, product variants and stock availability.\\n\",\n  \"base_url\": \"{{SHOP_API}}\",\n  \"auth_type\": \"API_KEY\",\n  \"requires_certificate\": false,\n  \"auth_config\": {\n    \"api_key\": {\n      \"headers\": [\n        {\n          \"field_name\": \"X-API-Key\",\n          \"value\": \"{{SHOP_API_KEY}}\",\n          \"prefix\": \"\"\n        }\n      ]\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -898,7 +898,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"search_products\",\n  \"description\": \"Search the DemoStore catalogue. Use this whenever the customer asks what is available, names a device, or asks about price. Each result includes variants with their own id, price_cents and stock — in this catalogue the variant is what carries the colour, the storage and the memory, and each variant has its own price. You must pass a VARIANT id (not the product id) to add_cart_item. Prefer limit=3 so the reply stays readable in chat.\",\n  \"request_definition\": {\n    \"method\": \"GET\",\n    \"path\": \"/v1/products\",\n    \"path_parameters\": {},\n    \"query_parameters\": {\n      \"q\": {\n        \"type\": \"string\",\n        \"description\": \"Free-text search over product title, description and SKU. Accent-insensitive.\",\n        \"required\": false\n      },\n      \"category\": {\n        \"type\": \"string\",\n        \"description\": \"Category slug or id to restrict results to. Use list_categories to discover valid values.\",\n        \"required\": false\n      },\n      \"in_stock\": {\n        \"type\": \"string\",\n        \"description\": \"Set to \\\"true\\\" to return only products with at least one variant in stock.\",\n        \"required\": false\n      },\n      \"limit\": {\n        \"type\": \"integer\",\n        \"description\": \"Maximum products to return. Keep small (3-5) for chat, since long lists are hard to read on WhatsApp.\",\n        \"required\": false\n      },\n      \"min_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Lowest acceptable price in cents (50.00 is 5000). Use when the customer sets a budget floor.\",\n        \"required\": false\n      },\n      \"max_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Highest acceptable price in cents (100.00 is 10000). Use when the customer says \\\"under 100\\\" or similar.\",\n        \"required\": false\n      }\n    },\n    \"headers\": {},\n    \"body\": null\n  },\n  \"user_auth_required\": false,\n  \"user_auth_action_config\": null\n}",
+              "raw": "{\n  \"name\": \"search_products\",\n  \"description\": \"Search the StoreFront catalogue. Use this whenever the customer asks what is available, names a device, or asks about price. Each result includes variants with their own id, price_cents and stock — in this catalogue the variant is what carries the colour, the storage and the memory, and each variant has its own price. You must pass a VARIANT id (not the product id) to add_cart_item. Prefer limit=3 so the reply stays readable in chat.\",\n  \"request_definition\": {\n    \"method\": \"GET\",\n    \"path\": \"/v1/products\",\n    \"path_parameters\": {},\n    \"query_parameters\": {\n      \"q\": {\n        \"type\": \"string\",\n        \"description\": \"Free-text search over product title, description and SKU. Accent-insensitive.\",\n        \"required\": false\n      },\n      \"category\": {\n        \"type\": \"string\",\n        \"description\": \"Category slug or id to restrict results to. Use list_categories to discover valid values.\",\n        \"required\": false\n      },\n      \"in_stock\": {\n        \"type\": \"string\",\n        \"description\": \"Set to \\\"true\\\" to return only products with at least one variant in stock.\",\n        \"required\": false\n      },\n      \"limit\": {\n        \"type\": \"integer\",\n        \"description\": \"Maximum products to return. Keep small (3-5) for chat, since long lists are hard to read on WhatsApp.\",\n        \"required\": false\n      },\n      \"min_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Lowest acceptable price in cents (50.00 is 5000). Use when the customer sets a budget floor.\",\n        \"required\": false\n      },\n      \"max_price\": {\n        \"type\": \"integer\",\n        \"description\": \"Highest acceptable price in cents (100.00 is 10000). Use when the customer says \\\"under 100\\\" or similar.\",\n        \"required\": false\n      }\n    },\n    \"headers\": {},\n    \"body\": null\n  },\n  \"user_auth_required\": false,\n  \"user_auth_action_config\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1232,7 +1232,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -1275,7 +1275,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -1309,6 +1309,65 @@
           ],
           "request": {
             "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"demostore\",\n  \"description\": \"DemoStore electronics store. Product catalogue, prices, variants and stock availability.\\n\",\n  \"base_url\": \"{{SHOP_API}}\",\n  \"auth_type\": \"API_KEY\",\n  \"requires_certificate\": false,\n  \"auth_config\": {\n    \"api_key\": {\n      \"headers\": [\n        {\n          \"field_name\": \"X-API-Key\",\n          \"value\": \"{{SHOP_API_KEY}}\",\n          \"prefix\": \"\"\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{API}}/{{ENTITY_ID}}/agent_config/skills?agent_id={{AGENT_ID}}",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{ENTITY_ID}}",
+                "agent_config",
+                "skills"
+              ],
+              "query": [
+                {
+                  "key": "agent_id",
+                  "value": "{{AGENT_ID}}"
+                }
+              ]
+            },
+            "description": "Captures `CONNECTOR_ID`.\n\n- `auth_config` is a **JSON object**, not a JSON-encoded string. This is the most common 400 on this endpoint.\n- `auth_type` is one of `API_KEY`, `OAUTH2_CLIENT_CREDENTIALS`, `NONE`. `API_KEY` may be combined with mTLS; OAuth may not.\n- `name` becomes part of the tool name the agent sees, so keep it short and descriptive. Hyphens become underscores.\n- If this fails with no connector id at all, check the connector provisioning prerequisite before anything else."
+          },
+          "response": []
+        },
+        {
+          "name": "03.11 · Delete your connector and tools (Optional)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);\nconst setVar = (k, v) => {\n  pm.collectionVariables.set(k, v);\n  if (pm.environment.name) pm.environment.set(k, v);\n};\nif (ok) {\n  let j = {}; try { j = pm.response.json(); } catch (e) {}\n  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);\n  if (v) { setVar('CONNECTOR_ID', v); console.log('CONNECTOR_ID =', v); }\n  else console.warn('CONNECTOR_ID not found in response — set it by hand');\n}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
             "header": [
               {
                 "key": "Authorization",
@@ -1379,7 +1438,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "body": {
@@ -1431,7 +1490,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "body": {
@@ -1483,7 +1542,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -1537,7 +1596,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"release\",\n  \"to\": \"{{CONSUMER_PHONE}}\"\n}",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"release\",\n  \"to\": \"{{CONSUMER_PHONE}}\",\n  \"metadata\": \"Conversation complete.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1562,7 +1621,7 @@
           "response": []
         },
         {
-          "name": "05.02· Pass thread control to MBA",
+          "name": "05.02 · Pass thread control to MBA",
           "event": [
             {
               "listen": "test",
@@ -1592,7 +1651,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"pass\",\n  \"to\": \"{{CONSUMER_PHONE}}\",\n  \"control_pass\": {\n    \"target_role\": \"ai_agent\"\n  }\n}",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"pass\",\n  \"to\": \"{{CONSUMER_PHONE}}\",\n  \"control_pass\": {\n    \"target_role\": \"ai_agent\"\n  },\n  \"metadata\": \"Human handling complete — returning to the agent.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1617,7 +1676,7 @@
           "response": []
         },
         {
-          "name": "05.03· Take thread control (for escalation partner only)",
+          "name": "05.03 · Take thread control (for escalation partner only)",
           "event": [
             {
               "listen": "test",
@@ -1647,7 +1706,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"take\",\n  \"to\": \"{{CONSUMER_PHONE}}\"\n}",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"action\": \"take\",\n  \"to\": \"{{CONSUMER_PHONE}}\",\n  \"metadata\": \"Human agent stepping in\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1708,7 +1767,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rollout\": {\n    \"enabled\": true\n  }\n}",
+              "raw": "{\n  \"rollout\": {\n    \"enabled\": true\n  },\n  \"ai_audience\": \"EVERYONE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1797,7 +1856,7 @@
               }
             ],
             "url": {
-              "raw": "{{SHOP_API}}/v1/products?limit=3&in_stock=true",
+              "raw": "{{SHOP_API}}/v1/products?limit=10&in_stock=true",
               "host": [
                 "{{SHOP_API}}"
               ],
@@ -1808,7 +1867,7 @@
               "query": [
                 {
                   "key": "limit",
-                  "value": "3"
+                  "value": "10"
                 },
                 {
                   "key": "in_stock",

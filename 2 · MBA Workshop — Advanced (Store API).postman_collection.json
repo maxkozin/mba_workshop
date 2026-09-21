@@ -18,18 +18,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
-                  "const setVar = (k, v) => {",
-                  "  pm.collectionVariables.set(k, v);",
-                  "  if (pm.environment.name) pm.environment.set(k, v);",
-                  "};",
-                  "if (ok) {",
-                  "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
-                  "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
-                  "  if (v) { setVar('WEBSITE_ID', v); console.log('WEBSITE_ID =', v); }",
-                  "  else console.warn('WEBSITE_ID not found in response — set it by hand');",
-                  "}"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);\nconst setVar = (k, v) => {\n  pm.collectionVariables.set(k, v);\n  if (pm.environment.name) pm.environment.set(k, v);\n};\nif (ok) {\n  let j = {}; try { j = pm.response.json(); } catch (e) {}\n  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);\n  if (v) { setVar('WEBSITE_ID', v); console.log('WEBSITE_ID =', v); }\n  else console.warn('WEBSITE_ID not found in response — set it by hand');\n}"
                 ]
               }
             }
@@ -47,12 +36,12 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://elecstore.com\",\n  \"crawl_depth\": 2,\n  \"crawl_frequency\": \"weekly\",\n  \"include_patterns\": [\n    \"/products\",\n    \"/warranty\",\n    \"/delivery\",\n    \"/blog\"\n  ],\n  \"exclude_patterns\": [\n    \"/cart\",\n    \"/checkout\",\n    \"/account\"\n  ]\n}",
+              "raw": "{\n  \"url\": \"https://mba-workshop-storefront.vercel.app/store?tenant={{SHOP_TENANT_ID}}\",\n  \"crawl_depth\": 2,\n  \"crawl_frequency\": \"weekly\",\n  \"include_patterns\": [\n    \"/store\",\n    \"/store/products\"\n  ],\n  \"exclude_patterns\": [\n    \"/cart\",\n    \"/checkout\",\n    \"/account\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -82,8 +71,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -101,7 +89,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -127,8 +115,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -139,6 +126,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
               }
             ],
             "body": {
@@ -146,7 +137,7 @@
               "formdata": [
                 {
                   "key": "file_name",
-                  "value": "garantia-voltz.pdf",
+                  "value": "warranty.pdf",
                   "type": "text"
                 },
                 {
@@ -157,7 +148,7 @@
                 {
                   "key": "file",
                   "type": "file",
-                  "value": null
+                  "src": []
                 }
               ]
             },
@@ -1412,8 +1403,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -1436,7 +1426,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"input\": \"{\\\"q\\\":\\\"fone bluetooth\\\",\\\"limit\\\":3}\"\n}",
+              "raw": "{\n  \"input\": \"{\\\"q\\\":\\\"Smartphone\\\",\\\"limit\\\":3}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2614,8 +2604,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -2638,7 +2627,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"api_key\": {\n    \"headers\": [\n      {\n        \"field_name\": \"X-API-Key\",\n        \"value\": \"{{SHOP_API_KEY}}\",\n        \"prefix\": \"\"\n      }\n    ]\n  }\n}",
+              "raw": "{\n  \"api_key_config\": {\n    \"headers\": [\n      {\n        \"field_name\": \"X-API-Key\",\n        \"value\": \"{{SHOP_API_KEY}}\",\n        \"prefix\": \"\"\n      }\n    ]\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2938,18 +2927,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);",
-                  "const setVar = (k, v) => {",
-                  "  pm.collectionVariables.set(k, v);",
-                  "  if (pm.environment.name) pm.environment.set(k, v);",
-                  "};",
-                  "if (ok) {",
-                  "  let j = {}; try { j = pm.response.json(); } catch (e) {}",
-                  "  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);",
-                  "  if (v) { setVar('AGENT_EVENT_ID', v); console.log('AGENT_EVENT_ID =', v); }",
-                  "  else console.warn('AGENT_EVENT_ID not found in response — set it by hand');",
-                  "}"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);\nconst setVar = (k, v) => {\n  pm.collectionVariables.set(k, v);\n  if (pm.environment.name) pm.environment.set(k, v);\n};\nif (ok) {\n  let j = {}; try { j = pm.response.json(); } catch (e) {}\n  const v = j.id ?? j.data?.id ?? (Array.isArray(j.data) ? j.data[0]?.id : undefined);\n  if (v) { setVar('AGENT_EVENT_ID', v); console.log('AGENT_EVENT_ID =', v); }\n  else console.warn('AGENT_EVENT_ID not found in response — set it by hand');\n}"
                 ]
               }
             }
@@ -2972,7 +2950,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"to\": \"{{CONSUMER_PHONE_DIGITS}}\",\n  \"event\": {\n    \"type\": \"payment.succeeded\",\n    \"description\": \"The PIX payment for order ord_demo1 has been confirmed. Tell the customer the order is paid and already being picked, and give them the order number. Do not offer any further products in this message.\",\n    \"payload\": \"{\\\"order_id\\\":\\\"ord_demo1\\\",\\\"payment_id\\\":\\\"pay_demo1\\\",\\\"method\\\":\\\"pix\\\",\\\"amount_cents\\\":29900,\\\"currency\\\":\\\"BRL\\\"}\"\n  }\n}",
+              "raw": "{\n  \"to\": \"{{CONSUMER_PHONE_DIGITS}}\",\n  \"event\": {\n    \"type\": \"payment.succeeded\",\n    \"description\": \"The payment for order ord_demo1 has been confirmed. Tell the customer the order is paid and already being picked, and give them the order number. Do not offer any further products in this message.\",\n    \"payload\": \"{\\\"order_id\\\":\\\"ord_demo1\\\",\\\"payment_id\\\":\\\"pay_demo1\\\",\\\"method\\\":\\\"card\\\",\\\"amount_cents\\\":29900,\\\"currency\\\":\\\"GBP\\\"}\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3001,8 +2979,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -3025,7 +3002,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"to\": \"{{CONSUMER_PHONE_DIGITS}}\",\n  \"event\": {\n    \"type\": \"shipment.updated\",\n    \"description\": \"Order ord_demo1 went out for delivery today. Tell the customer, and give the tracking code BR123456789BR on its own line so they can copy it.\",\n    \"payload\": \"{\\\"order_id\\\":\\\"ord_demo1\\\",\\\"shipment_id\\\":\\\"shp_demo1\\\",\\\"status\\\":\\\"out_for_delivery\\\",\\\"tracking_code\\\":\\\"BR123456789BR\\\"}\"\n  }\n}",
+              "raw": "{\n  \"to\": \"{{CONSUMER_PHONE_DIGITS}}\",\n  \"event\": {\n    \"type\": \"shipment.updated\",\n    \"description\": \"Order ord_demo1 went out for delivery today. Tell the customer, and give the tracking code UK123456789BR on its own line so they can copy it.\",\n    \"payload\": \"{\\\"order_id\\\":\\\"ord_demo1\\\",\\\"shipment_id\\\":\\\"shp_demo1\\\",\\\"status\\\":\\\"out_for_delivery\\\",\\\"tracking_code\\\":\\\"UK123456789BR\\\"}\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3432,7 +3409,7 @@
       "description": "## Summary\n\nA simulation → evaluation → summary workflow. Instead of reading conversations one by one, you define cases, run them, and get scored results plus recommendations.\n\nBase: `{{API}}/{{ENTITY_ID}}/agent-eval`\n\nThis is the part most partners skip and then cannot answer \"did the change help?\". Run an eval before and after a skill edit and the answer stops being an opinion."
     },
     {
-      "name": "08 · Observability — conversation turns",
+      "name": "08 · Observability - monitor & debug",
       "item": [
         {
           "name": "08.01 · Conversation turns for one consumer",
@@ -3442,8 +3419,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -3461,7 +3437,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -3494,8 +3470,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-                  "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
                 ]
               }
             }
@@ -3513,7 +3488,7 @@
               },
               {
                 "key": "X-API-Version",
-                "value": "1.0.0"
+                "value": "2.0.0"
               }
             ],
             "url": {
@@ -3547,6 +3522,183 @@
               ]
             },
             "description": "The same endpoint, scoped to when the thing you are debugging actually happened. On a chatty number the unfiltered call is mostly noise.\n\n| Param | Notes |\n|---|---|\n| `start_timestamp_ms` | Inclusive lower bound. |\n| `end_timestamp_ms` | Inclusive upper bound. |\n\nThree things about these bounds that are easy to get wrong:\n\n- **They are milliseconds.** Passing seconds is not an error — it silently matches nothing, which reads exactly like \"there were no conversations\".\n- **They filter on the *start* of the turn**, taken from the timestamp of the customer's message. A turn that began inside the window and ran past the end is included whole.\n- **An inverted range is a 400**, not an empty result: `end_timestamp_ms must be greater than or equal to start_timestamp_ms`. Equal bounds are legal and return the turn at that instant.\n\nSet `TURNS_START_MS` and `TURNS_END_MS` in the environment. Filtering composes with `limit` and with cursor pagination, so you can narrow first and page second.\n\nSupplying both `before` and `after` is a 400. When you reach the end of the results, the response simply omits `after` — that absence is the terminator, not an empty string."
+          },
+          "response": []
+        },
+        {
+          "name": "08.03 · Conversation Insights",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "url": {
+              "raw": "{{API}}/{{ENTITY_ID}}/insights/conversations?start_date=2026-09-01&end_date=2026-09-30",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{ENTITY_ID}}",
+                "insights",
+                "conversations"
+              ],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-09-30"
+                },
+                {
+                  "key": "metrics",
+                  "value": "ai_handoffs,ai_threads",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "API returns how many conversations the AI agent handled over a date range, and how many are currently handed to the business awaiting a reply."
+          },
+          "response": []
+        },
+        {
+          "name": "08.04 · Tool Calling Insights",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "url": {
+              "raw": "{{API}}/{{ENTITY_ID}}/insights/tool_calls?start_date=2026-09-01&end_date=2026-09-30",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{ENTITY_ID}}",
+                "insights",
+                "tool_calls"
+              ],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-09-30"
+                },
+                {
+                  "key": "tool_name",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns how each of your tools performed over a date range: how many conversations called it, how long it took to respond, and how often it succeeded, failed, or timed out."
+          },
+          "response": []
+        },
+        {
+          "name": "08.05 · Agent Event Insights",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "url": {
+              "raw": "{{API}}/{{ENTITY_ID}}/insights/agent_events?start_date=2026-09-01&end_date=2026-09-30",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{ENTITY_ID}}",
+                "insights",
+                "agent_events"
+              ],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-09-30"
+                },
+                {
+                  "key": "event_type",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns what happened to the events you sent your agent over a date range: how many arrived, how many the agent finished handling, and how long they took, broken down by the event type you supplied."
           },
           "response": []
         }
@@ -3925,53 +4077,117 @@
       "description": "## Summary\n\nUndo what the workshop created, in dependency order: skills, then tools, then the connector, then the agent.\n\n**Everything in this folder is destructive and none of it asks twice.** Read the variable each request targets before sending."
     },
     {
-      "name": "11 Set Budget limit",
-      "item": []
-    },
-    {
-      "name": "01.02 · List crawled websites Copy",
-      "event": [
+      "name": "11 · Control MBA spend",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const ok = pm.response.code >= 200 && pm.response.code < 300;",
-              "pm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
-            ]
-          }
+          "name": "11.01 · Set budget limits",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"budgets\": [\n        {\n            \"budget_id\": \"daily_budget_in_tokens\",\n            \"unit_type\": \"token\",\n            \"time_window\": \"one_day\",\n            \"max_budget\": 1000000\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{API}}/{{BUSINESS_ID}}/agent_budget",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{BUSINESS_ID}}",
+                "agent_budget"
+              ]
+            },
+            "description": "Un-mutes the agent for this consumer so it resumes owning the conversation. Without this, `thread_control: release` is one-way, and a room that ran it during the demo will spend the rest of the session wondering why the agent went quiet.\n\nConfirm the action vocabulary against the current Thread Control reference before you build on it — the verbs are the part most likely to move."
+          },
+          "response": []
+        },
+        {
+          "name": "11.02 · Get all budget limits",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ok = pm.response.code >= 200 && pm.response.code < 300;\npm.test('2xx', () => pm.expect(ok, pm.response.text()).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{MBA_ACCESS_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Version",
+                "value": "2.0.0"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{API}}/{{BUSINESS_ID}}/agent_budget",
+              "host": [
+                "{{API}}"
+              ],
+              "path": [
+                "{{BUSINESS_ID}}",
+                "agent_budget"
+              ]
+            },
+            "description": "Un-mutes the agent for this consumer so it resumes owning the conversation. Without this, `thread_control: release` is one-way, and a room that ran it during the demo will spend the rest of the session wondering why the agent went quiet.\n\nConfirm the action vocabulary against the current Thread Control reference before you build on it — the verbs are the part most likely to move."
+          },
+          "response": []
         }
       ],
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{MBA_ACCESS_TOKEN}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-API-Version",
-            "value": "1.0.0"
-          }
-        ],
-        "url": {
-          "raw": "{{API}}/{{ENTITY_ID}}/agent_config/websites",
-          "host": [
-            "{{API}}"
-          ],
-          "path": [
-            "{{ENTITY_ID}}",
-            "agent_config",
-            "websites"
-          ]
-        },
-        "description": "Check `crawl_status` and `pages_crawled` before assuming the knowledge landed."
-      },
-      "response": []
+      "description": "A budget caps agent usage within a rolling time window."
     }
   ],
   "variable": [
@@ -4053,6 +4269,134 @@
     },
     {
       "key": "TURNS_END_MS",
+      "value": ""
+    },
+    {
+      "key": "WEBSITE_ID",
+      "value": ""
+    },
+    {
+      "key": "toolId_create_customer",
+      "value": ""
+    },
+    {
+      "key": "toolId_find_customer",
+      "value": ""
+    },
+    {
+      "key": "toolId_create_cart",
+      "value": ""
+    },
+    {
+      "key": "toolId_add_cart_item",
+      "value": ""
+    },
+    {
+      "key": "toolId_get_cart",
+      "value": ""
+    },
+    {
+      "key": "toolId_apply_discount",
+      "value": ""
+    },
+    {
+      "key": "toolId_get_shipping_rates",
+      "value": ""
+    },
+    {
+      "key": "toolId_select_shipping",
+      "value": ""
+    },
+    {
+      "key": "toolId_create_checkout",
+      "value": ""
+    },
+    {
+      "key": "toolId_get_checkout",
+      "value": ""
+    },
+    {
+      "key": "toolId_update_checkout",
+      "value": ""
+    },
+    {
+      "key": "toolId_complete_checkout",
+      "value": ""
+    },
+    {
+      "key": "toolId_create_payment",
+      "value": ""
+    },
+    {
+      "key": "toolId_get_payment",
+      "value": ""
+    },
+    {
+      "key": "toolId_find_my_orders",
+      "value": ""
+    },
+    {
+      "key": "toolId_get_order",
+      "value": ""
+    },
+    {
+      "key": "toolId_track_shipment",
+      "value": ""
+    },
+    {
+      "key": "toolId_cancel_order",
+      "value": ""
+    },
+    {
+      "key": "skillId_10-cart",
+      "value": ""
+    },
+    {
+      "key": "skillId_11-checkout",
+      "value": ""
+    },
+    {
+      "key": "skillId_12-payment",
+      "value": ""
+    },
+    {
+      "key": "skillId_13-order-status",
+      "value": ""
+    },
+    {
+      "key": "skillId_14-changes",
+      "value": ""
+    },
+    {
+      "key": "skillId_15-accessory-attach",
+      "value": ""
+    },
+    {
+      "key": "skillId_16-spec-comparison",
+      "value": ""
+    },
+    {
+      "key": "skillId_17-stock-and-alternatives",
+      "value": ""
+    },
+    {
+      "key": "skillId_18-warranty-and-rma",
+      "value": ""
+    },
+    {
+      "key": "skillId_19-payment-options-br",
+      "value": ""
+    },
+    {
+      "key": "skillId_20-entrypoint-context",
+      "value": ""
+    },
+    {
+      "key": "skillId_21-proactive-events",
+      "value": ""
+    },
+    {
+      "key": "skillId_22-tool-error-handling",
       "value": ""
     }
   ]
