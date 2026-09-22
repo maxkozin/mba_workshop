@@ -1,0 +1,2232 @@
+{
+  "info": {
+    "_postman_id": "02497aa8-c844-4138-b1bd-b3628acb8024",
+    "name": "3 · MBA Workshop — Store API (Mock Ecommerce)",
+    "description": "# Mock Ecommerce Store API\n\nA deterministic, multi-tenant commerce simulator. **Nothing here touches real money** —\npayments, shipping and carriers are all simulated.\n\n## Setup\n\n1. Set `SHOP_API` to your deployment (already pointed at the workshop instance).\n2. Open `{{SHOP_API}}/admin`, sign in, pick or create a tenant, then **Create API key**.\n   The key is shown once, at creation.\n3. Paste it into the `SHOP_API_KEY` collection variable.\n4. Open **Runner**, select this collection, and run it top to bottom.\n\nFolders 01–07 form one continuous journey: catalogue → cart → checkout → payment →\ndelivery. Each request captures the ids the next one needs, so a clean run needs no\nhand-editing. Folder 08 is self-contained and exercises the failure paths.\n\n## Conventions\n\n- Auth is `X-API-Key`, set once at collection level and inherited everywhere.\n- **All money is integer minor units** — `1099` is £10.99. No floats ever touch a price.\n- Phone numbers are E.164, including the `+`.\n- Country is ISO 3166-1 alpha-2: `GB`, not `UK`.\n- Tax is quoted VAT-inclusive, so `tax_cents` is reported, not added to the total.\n\n## Rate limits\n\nEach tenant allows 120 requests a minute per API key by default, and a full pass of\nthis collection is about 49 requests. Two back-to-back Runner passes will trip it.\nEither wait a minute between runs, or raise **Rate limit per min** under the tenant\nconfig in the admin UI. Every request asserts it was not rate limited, so if you see\na wall of failures, check that first.\n\n## Reproducing a failure\n\nFailure injection is drawn from a per-tenant seeded PRNG, never `Math.random()`, so a\nfailing run replays exactly. Send an `X-Sim-Nonce` header and reuse it for byte-exact\nreplay across differing resource ids.\n\nInteractive docs: `{{SHOP_API}}/docs`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "25029079"
+  },
+  "item": [
+    {
+      "name": "00 · Start here",
+      "item": [
+        {
+          "name": "00.01 · Health and version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"reports ok\", () => pm.expect(j.status).to.eql(\"ok\"));",
+                  "if (j.driver === \"pglite\") {",
+                  "  console.warn(\"Ephemeral in-memory database: data will not survive a cold start.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/healthz",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "Unauthenticated. Confirms the service is up and reports which database driver it is on — `postgres` when a real database is attached, `pglite` when it is running on the ephemeral in-memory fallback."
+          },
+          "response": []
+        },
+        {
+          "name": "00.02 · OpenAPI spec",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/openapi.json",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "openapi.json"
+              ]
+            },
+            "description": "The full spec. This is what an agent reads to build its tool definitions. Browsable UI at `{{SHOP_API}}/docs`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Set `SHOP_API` and `SHOP_API_KEY` first.\n\nIssue a key in the admin UI at `{{SHOP_API}}/admin` → pick a tenant → **Create API key**. It is shown once, at creation.\n\nThen hit **Runner** on this collection and run it top to bottom: every folder feeds the next."
+    },
+    {
+      "name": "01 · Catalog",
+      "item": [
+        {
+          "name": "01.01 · List products (in stock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"returns products\", () => pm.expect(j.data).to.be.an(\"array\").that.is.not.empty);",
+                  "",
+                  "const product = j.data.find(p => (p.variants || []).some(v => v.stock > 0));",
+                  "pm.test(\"found a purchasable variant\", () => pm.expect(product, \"no in-stock variant\").to.exist);",
+                  "",
+                  "const variant = product.variants.find(v => v.stock > 0);",
+                  "pm.collectionVariables.set(\"PRODUCT_ID\", product.id);",
+                  "pm.collectionVariables.set(\"VARIANT_ID\", variant.id);",
+                  "console.log(`${product.title} — ${(variant.price_cents / 100).toFixed(2)} ${variant.currency}`);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/products?in_stock=true&limit=5",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "in_stock",
+                  "value": "true"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Captures the first in-stock variant into `PRODUCT_ID` / `VARIANT_ID`. Everything downstream depends on this request."
+          },
+          "response": []
+        },
+        {
+          "name": "01.02 · Get a product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/products/{{PRODUCT_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "{{PRODUCT_ID}}"
+              ]
+            },
+            "description": "Full detail for the product captured above, including every variant and its stock level."
+          },
+          "response": []
+        },
+        {
+          "name": "01.03 · Search and filter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/products?limit=3&q=headphones",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "3"
+                },
+                {
+                  "key": "q",
+                  "value": "headphones"
+                }
+              ]
+            },
+            "description": "Free-text `q` plus price bounds in minor units (pence). Tune `q` to your catalogue preset — try `coffee` for grocery, `laptop` for electronics."
+          },
+          "response": []
+        },
+        {
+          "name": "01.04 · List categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/categories",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "The category tree for this tenant."
+          },
+          "response": []
+        },
+        {
+          "name": "01.05 · Product image (SVG)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/images/{{PRODUCT_ID}}.svg",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "images",
+                "{{PRODUCT_ID}}.svg"
+              ]
+            },
+            "description": "Generated from the SKU string alone — no database read, no tenant data — so it is safe unauthenticated and works directly in an `<img>` tag. Set `PRODUCT_SKU` to any SKU, e.g. `FAS-0001`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Read-only. Captures `PRODUCT_ID` and `VARIANT_ID` for the cart flow."
+    },
+    {
+      "name": "02 · Customers",
+      "item": [
+        {
+          "name": "02.01 · Create or fetch a customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"created or fetched\", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.collectionVariables.set(\"CUSTOMER_ID\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{CONSUMER_PHONE}}\",\n  \"email\": \"ada@example.co.uk\",\n  \"name\": \"Ada Lovelace\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/customers",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "customers"
+              ]
+            },
+            "description": "Idempotent on phone number: call it twice and you get the same customer back, not a duplicate or a 409. Returns **201** when it creates one and **200** when it hands back an existing record — so this assertion accepts either."
+          },
+          "response": []
+        },
+        {
+          "name": "02.02 · Find by phone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/customers?phone={{CONSUMER_PHONE}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{CONSUMER_PHONE}}"
+                }
+              ]
+            },
+            "description": "Lookup by phone or email. The phone must be E.164, including the `+`."
+          },
+          "response": []
+        },
+        {
+          "name": "02.03 · Get a customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/customers/{{CUSTOMER_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "customers",
+                "{{CUSTOMER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02.04 · Add an address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"ADDRESS_ID\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ada Lovelace\",\n  \"line1\": \"221B Baker Street\",\n  \"city\": \"London\",\n  \"postal_code\": \"NW1 6XE\",\n  \"country\": \"GB\",\n  \"label\": \"Home\",\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/customers/{{CUSTOMER_ID}}/addresses",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "customers",
+                "{{CUSTOMER_ID}}",
+                "addresses"
+              ]
+            },
+            "description": "`country` defaults to `GB`. Note it is the ISO 3166-1 alpha-2 code — `GB`, not `UK`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Shoppers are keyed by E.164 phone number. Creating one twice returns the same record."
+    },
+    {
+      "name": "03 · Cart",
+      "item": [
+        {
+          "name": "03.01 · Create a cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"CART_ID\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"{{CUSTOMER_ID}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts"
+              ]
+            },
+            "description": "Attaching `customer_id` is optional — an anonymous cart works too, and can be claimed later at checkout."
+          },
+          "response": []
+        },
+        {
+          "name": "03.02 · Add an item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const line = (j.items || []).find(i => i.variant_id === pm.collectionVariables.get(\"VARIANT_ID\")) || (j.items || [])[0];",
+                  "if (line) pm.collectionVariables.set(\"CART_ITEM_ID\", line.id);",
+                  "pm.test(\"cart has a subtotal\", () => pm.expect(j.totals.subtotal_cents).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{VARIANT_ID}}\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}/items",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}",
+                "items"
+              ]
+            },
+            "description": "Adding the same variant twice increments the existing line rather than creating a second one. Returns **200** with the whole recomputed cart, not 201 — the cart already existed."
+          },
+          "response": []
+        },
+        {
+          "name": "03.03 · Get the cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}"
+              ]
+            },
+            "description": "Shows the full totals breakdown: subtotal, discount, shipping, tax and total."
+          },
+          "response": []
+        },
+        {
+          "name": "03.04 · Change a quantity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}/items/{{CART_ITEM_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}",
+                "items",
+                "{{CART_ITEM_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03.05 · Apply a discount code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"discount applied\", () => pm.expect(j.totals.discount_cents).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"WELCOME10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}/discounts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}",
+                "discounts"
+              ]
+            },
+            "description": "Seeded catalogues ship with three demo codes:\n\n- `WELCOME10` — 10% off, no minimum\n- `FREESHIP` — free shipping over £30\n- `SAVE20` — £20 off over £100"
+          },
+          "response": []
+        }
+      ],
+      "description": "Totals recompute on every mutation. Prices are minor units (pence) throughout."
+    },
+    {
+      "name": "04 · Shipping and checkout",
+      "item": [
+        {
+          "name": "04.01 · Quote shipping rates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const rates = j.data || j.rates || j;",
+                  "if (Array.isArray(rates) && rates.length) {",
+                  "  pm.collectionVariables.set(\"SHIPPING_METHOD_CODE\", rates[0].code);",
+                  "  rates.forEach(r => console.log(`${r.code}: ${r.label} — ${(r.price_cents / 100).toFixed(2)}`));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/shipping/rates?cart_id={{CART_ID}}&postal_code=NW1 6XE",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "shipping",
+                "rates"
+              ],
+              "query": [
+                {
+                  "key": "cart_id",
+                  "value": "{{CART_ID}}"
+                },
+                {
+                  "key": "postal_code",
+                  "value": "NW1 6XE"
+                }
+              ]
+            },
+            "description": "Rates come from the tenant config. Anything over the free-shipping threshold (£50 by default) quotes standard delivery at zero."
+          },
+          "response": []
+        },
+        {
+          "name": "04.02 · Select a shipping method",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method_code\": \"standard\",\n  \"postal_code\": \"NW1 6XE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}/shipping",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}",
+                "shipping"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04.03 · Start a checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"CHECKOUT_ID\", j.id);",
+                  "if (j.missing && j.missing.length) console.log(\"still missing:\", j.missing.join(\", \"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cart_id\": \"{{CART_ID}}\",\n  \"phone\": \"{{CONSUMER_PHONE}}\",\n  \"email\": \"ada@example.co.uk\",\n  \"shipping_address\": {\n    \"name\": \"Ada Lovelace\",\n    \"line1\": \"221B Baker Street\",\n    \"city\": \"London\",\n    \"postal_code\": \"NW1 6XE\",\n    \"country\": \"GB\"\n  },\n  \"shipping_method_code\": \"standard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04.04 · Get the checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts/{{CHECKOUT_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts",
+                "{{CHECKOUT_ID}}"
+              ]
+            },
+            "description": "`ready_to_complete` tells you whether the next call will succeed; `missing` lists what is still required."
+          },
+          "response": []
+        },
+        {
+          "name": "04.05 · Update checkout details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billing_address\": {\n    \"name\": \"Ada Lovelace\",\n    \"line1\": \"221B Baker Street\",\n    \"city\": \"London\",\n    \"postal_code\": \"NW1 6XE\",\n    \"country\": \"GB\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts/{{CHECKOUT_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts",
+                "{{CHECKOUT_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04.06 · Complete → order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fresh key per run, reused by the replay request that follows.",
+                  "pm.collectionVariables.set(\"IDEMPOTENCY_KEY\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"ORDER_ID\", j.order_id);",
+                  "pm.test(\"not a replay on first call\", () => pm.expect(j.replayed).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{IDEMPOTENCY_KEY}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts/{{CHECKOUT_ID}}/complete",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts",
+                "{{CHECKOUT_ID}}",
+                "complete"
+              ]
+            },
+            "description": "Turns the cart into an order. Send an `Idempotency-Key` so a retry cannot double-charge."
+          },
+          "response": []
+        },
+        {
+          "name": "04.07 · Complete again → proves replay",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"same order id\", () => pm.expect(j.order_id).to.eql(pm.collectionVariables.get(\"ORDER_ID\")));",
+                  "pm.test(\"flagged as a replay\", () => pm.expect(j.replayed).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{IDEMPOTENCY_KEY}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts/{{CHECKOUT_ID}}/complete",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts",
+                "{{CHECKOUT_ID}}",
+                "complete"
+              ]
+            },
+            "description": "Same idempotency key as 04.06. Returns the *same* order with `replayed: true` rather than creating a second one — the behaviour a flaky mobile network makes you care about."
+          },
+          "response": []
+        }
+      ],
+      "description": "Quote → select → checkout → order. The completion step is idempotent."
+    },
+    {
+      "name": "05 · Payments",
+      "item": [
+        {
+          "name": "05.01 · Pay by bank transfer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set(\"PAYMENT_ID\", j.id);",
+                  "pm.test(\"starts pending\", () => pm.expect(j.status).to.eql(\"pending\"));",
+                  "pm.test(\"carries a payment reference\", () => pm.expect(j.details.payment_reference).to.be.a(\"string\"));",
+                  "console.log(`${j.details.sort_code} / ${j.details.account_number} ref ${j.details.payment_reference}`);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{ORDER_ID}}\",\n  \"method\": \"bank_transfer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "Returns UK bank details to quote: sort code, 8-digit account number and a payment reference. The sort code sits in the reserved 04-xx-xx test range and cannot move money."
+          },
+          "response": []
+        },
+        {
+          "name": "05.02 · Get the payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments/{{PAYMENT_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{PAYMENT_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05.03 · Open Banking QR (SVG)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments/{{PAYMENT_ID}}/qrcode.svg",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{PAYMENT_ID}}",
+                "qrcode.svg"
+              ]
+            },
+            "description": "Deliberately **not** scannable — the service never emits anything mistakable for a real payment instrument. It exists so a demo screen has something to show."
+          },
+          "response": []
+        },
+        {
+          "name": "05.04 · Settle it now",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"succeeded\", () => pm.expect(pm.response.json().status).to.eql(\"succeeded\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outcome\": \"succeed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments/{{PAYMENT_ID}}/simulate",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{PAYMENT_ID}}",
+                "simulate"
+              ]
+            },
+            "description": "The time-travel lever: settles the payment immediately instead of waiting on its expiry clock. Paying an order also decrements stock and creates a shipment."
+          },
+          "response": []
+        },
+        {
+          "name": "05.05 · Partial refund",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"partially refunded\", () => pm.expect(pm.response.json().status).to.eql(\"partially_refunded\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount_cents\": 500,\n  \"reason\": \"Goodwill gesture\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments/{{PAYMENT_ID}}/refund",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{PAYMENT_ID}}",
+                "refund"
+              ]
+            },
+            "description": "Omit `amount_cents` to refund the remaining balance in full. A full refund restores stock and moves the order to `refunded`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Nothing here touches real money. Four instruments are modelled, each with a different settlement shape:\n\n| Method | Shape |\n|---|---|\n| `card` | immediate, may decline |\n| `link` | hosted page, settles out of band |\n| `bank_transfer` | Faster Payments / Open Banking, 15-minute window |\n| `direct_debit` | Bacs, collects in 3 working days |\n\nOnly `card`, `link` and `bank_transfer` are enabled by default — tick `direct_debit` in the admin UI to turn it on."
+    },
+    {
+      "name": "06 · Orders and shipments",
+      "item": [
+        {
+          "name": "06.01 · List orders by phone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/orders?phone={{CONSUMER_PHONE}}&limit=10",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{CONSUMER_PHONE}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "The lookup a support agent actually performs. Remember to URL-encode the leading `+` if you build this by hand."
+          },
+          "response": []
+        },
+        {
+          "name": "06.02 · Get the order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const s = (j.shipments || [])[0];",
+                  "if (s) pm.collectionVariables.set(\"SHIPMENT_ID\", s.id);",
+                  "else console.warn(\"No shipment yet — an order gets one once it is paid.\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/orders/{{ORDER_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "{{ORDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06.03 · Get the shipment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/shipments/{{SHIPMENT_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "shipments",
+                "{{SHIPMENT_ID}}"
+              ]
+            },
+            "description": "Includes the full tracking history, not just the current status."
+          },
+          "response": []
+        },
+        {
+          "name": "06.04 · Advance → out for delivery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"out_for_delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/shipments/{{SHIPMENT_ID}}/advance",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "shipments",
+                "{{SHIPMENT_ID}}",
+                "advance"
+              ]
+            },
+            "description": "Valid states: `label_created`, `in_transit`, `out_for_delivery`, `delivered`. Omit the body to step to the next one automatically."
+          },
+          "response": []
+        },
+        {
+          "name": "06.05 · Advance → delivered",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/shipments/{{SHIPMENT_ID}}/advance",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "shipments",
+                "{{SHIPMENT_ID}}",
+                "advance"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Fulfilment you can fast-forward instead of waiting three days for."
+    },
+    {
+      "name": "07 · Events",
+      "item": [
+        {
+          "name": "07.01 · Poll the feed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const events = j.data || [];",
+                  "if (events.length) pm.collectionVariables.set(\"EVENT_CURSOR\", events[events.length - 1].id);",
+                  "console.log(events.map(e => e.type).join(\", \"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/events?limit=50",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Captures the newest event id into `EVENT_CURSOR` so the next poll can ask only for what it has not seen."
+          },
+          "response": []
+        },
+        {
+          "name": "07.02 · Poll from the cursor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/events?after={{EVENT_CURSOR}}&limit=50",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "after",
+                  "value": "{{EVENT_CURSOR}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Immediately after 07.01 this is empty — that is the point. Run something else, then come back."
+          },
+          "response": []
+        },
+        {
+          "name": "07.03 · Filter by type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/events?type=payment.succeeded&limit=20",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "payment.succeeded"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "A polling feed of everything that happened, for building a webhook-free integration."
+    },
+    {
+      "name": "08 · Failure injection",
+      "item": [
+        {
+          "name": "08.01 · Cart for the failure tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"FAIL_CART_ID\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.02 · Add an item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{VARIANT_ID}}\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{FAIL_CART_ID}}/items",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{FAIL_CART_ID}}",
+                "items"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.03 · Checkout → order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"FAIL_CHECKOUT_ID\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cart_id\": \"{{FAIL_CART_ID}}\",\n  \"phone\": \"{{CONSUMER_PHONE}}\",\n  \"shipping_address\": {\n    \"name\": \"Ada Lovelace\",\n    \"line1\": \"221B Baker Street\",\n    \"city\": \"London\",\n    \"postal_code\": \"NW1 6XE\",\n    \"country\": \"GB\"\n  },\n  \"shipping_method_code\": \"standard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.04 · Complete it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"FAIL_ORDER_ID\", pm.response.json().order_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/checkouts/{{FAIL_CHECKOUT_ID}}/complete",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "checkouts",
+                "{{FAIL_CHECKOUT_ID}}",
+                "complete"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.05 · Card declined",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"declined\", () => pm.expect(j.status).to.eql(\"failed\"));",
+                  "pm.test(\"with the configured reason\", () => pm.expect(j.failure_code).to.eql(\"card_declined\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{FAIL_ORDER_ID}}\",\n  \"method\": \"card\",\n  \"token\": \"4000000000000002\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "Test tokens always produce their configured outcome, whatever the tenant `success_rate`:\n\n| Token | Failure |\n|---|---|\n| `4000000000000002` | `card_declined` |\n| `4000000000009995` | `insufficient_funds` |\n| `4000000000000069` | `expired_card` |\n| `4000000000000127` | `incorrect_cvc` |\n| `4000000000000119` | `processing_error` |\n\nEditable per tenant under **Decline tokens** in the admin UI."
+          },
+          "response": []
+        },
+        {
+          "name": "08.06 · Insufficient funds",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"insufficient_funds\", () => pm.expect(pm.response.json().failure_code).to.eql(\"insufficient_funds\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{FAIL_ORDER_ID}}\",\n  \"method\": \"card\",\n  \"token\": \"4000000000009995\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.07 · Method not enabled → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 422\", () => pm.response.to.have.status(422));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"says which methods are enabled\", () => pm.expect(j.error.details.enabled_methods).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{FAIL_ORDER_ID}}\",\n  \"method\": \"direct_debit\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "Direct Debit is off by default. The error lists what *is* enabled, so a client can recover without guessing. Enable it in the admin UI and this turns into a pending Bacs collection."
+          },
+          "response": []
+        },
+        {
+          "name": "08.08 · A card that works",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"succeeded\", () => pm.expect(pm.response.json().status).to.eql(\"succeeded\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{FAIL_ORDER_ID}}\",\n  \"method\": \"card\",\n  \"token\": \"4111111111111111\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/payments",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "Same order, an ordinary token. Succeeds and settles the order."
+          },
+          "response": []
+        },
+        {
+          "name": "08.09 · Unknown discount code → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"rejected\", () => pm.expect(pm.response.code).to.be.oneOf([404, 409, 422]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"NOPE-DOES-NOT-EXIST\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{FAIL_CART_ID}}/discounts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{FAIL_CART_ID}}",
+                "discounts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08.10 · No API key → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"structured error\", () => pm.expect(pm.response.json().error.code).to.eql(\"unauthorized\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/products",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Every `/v1` route is behind the tenant plugin, so an unauthenticated call fails the same way everywhere — 401, never a 500."
+          },
+          "response": []
+        }
+      ],
+      "description": "The part a real ecommerce backend cannot give you: reaching a specific failure on purpose.\n\nSelf-contained — it builds its own cart and order so it does not disturb the happy path above.\n\nEvery draw is seeded from the tenant seed, never `Math.random()`, so a failing run replays byte-for-byte."
+    },
+    {
+      "name": "09 · Cart teardown",
+      "item": [
+        {
+          "name": "09.01 · Remove the discount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"ok\", () => pm.expect(pm.response.code).to.be.oneOf([200, 204, 404]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{FAIL_CART_ID}}/discounts",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{FAIL_CART_ID}}",
+                "discounts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09.02 · Remove an item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"handled\", () => pm.expect(pm.response.code).to.be.oneOf([200, 204, 404, 409]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{SHOP_API}}/v1/carts/{{CART_ID}}/items/{{CART_ITEM_ID}}",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "carts",
+                "{{CART_ID}}",
+                "items",
+                "{{CART_ITEM_ID}}"
+              ]
+            },
+            "description": "Note the cart from 03 is already converted to an order, so this may 409. That is the correct answer."
+          },
+          "response": []
+        },
+        {
+          "name": "09.03 · Cancel an order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"handled\", () => pm.expect(pm.response.code).to.be.oneOf([200, 409, 422]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer changed their mind\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{SHOP_API}}/v1/orders/{{FAIL_ORDER_ID}}/cancel",
+              "host": [
+                "{{SHOP_API}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "{{FAIL_ORDER_ID}}",
+                "cancel"
+              ]
+            },
+            "description": "A paid order cannot simply be cancelled — expect a 409 here, which is the point. Refund it first (05.05) and cancellation becomes valid."
+          },
+          "response": []
+        }
+      ],
+      "description": "Destructive, kept last so the Runner does not pull the rug out from under the flow above."
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{SHOP_API_KEY}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// A full pass is ~49 requests against a default limit of 120/min per key.",
+          "// Back-to-back runs trip it, and the resulting 429s cascade into",
+          "// confusing 404s downstream, so name the real cause here.",
+          "if (pm.response.code === 429) {",
+          "  console.warn(\"429 — tenant rate limit. Wait 60s, or raise limits.rate_limit_per_min in the admin UI.\");",
+          "}",
+          "pm.test(\"not rate limited\", () => pm.expect(pm.response.code).to.not.eql(429));"
+        ]
+      }
+    },
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"SHOP_API_KEY\")) {",
+          "  console.warn(\"SHOP_API_KEY is empty — issue one at \" + pm.collectionVariables.get(\"SHOP_API\") + \"/admin\");",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "SHOP_API",
+      "value": "https://mba-workshop-storefront.vercel.app"
+    },
+    {
+      "key": "SHOP_API_KEY",
+      "value": ""
+    },
+    {
+      "key": "CONSUMER_PHONE",
+      "value": "+447700900123"
+    },
+    {
+      "key": "PRODUCT_SKU",
+      "value": "FAS-0001"
+    },
+    {
+      "key": "PRODUCT_ID",
+      "value": ""
+    },
+    {
+      "key": "VARIANT_ID",
+      "value": ""
+    },
+    {
+      "key": "CUSTOMER_ID",
+      "value": ""
+    },
+    {
+      "key": "ADDRESS_ID",
+      "value": ""
+    },
+    {
+      "key": "CART_ID",
+      "value": ""
+    },
+    {
+      "key": "CART_ITEM_ID",
+      "value": ""
+    },
+    {
+      "key": "SHIPPING_METHOD_CODE",
+      "value": ""
+    },
+    {
+      "key": "CHECKOUT_ID",
+      "value": ""
+    },
+    {
+      "key": "IDEMPOTENCY_KEY",
+      "value": ""
+    },
+    {
+      "key": "ORDER_ID",
+      "value": ""
+    },
+    {
+      "key": "PAYMENT_ID",
+      "value": ""
+    },
+    {
+      "key": "SHIPMENT_ID",
+      "value": ""
+    },
+    {
+      "key": "EVENT_CURSOR",
+      "value": ""
+    },
+    {
+      "key": "FAIL_CART_ID",
+      "value": ""
+    },
+    {
+      "key": "FAIL_CHECKOUT_ID",
+      "value": ""
+    },
+    {
+      "key": "FAIL_ORDER_ID",
+      "value": ""
+    }
+  ]
+}
