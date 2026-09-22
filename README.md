@@ -13,7 +13,9 @@
 - Prepare BISU token with scopes - **whatsapp_business_management** and **whatsapp_business_messaging**.
 
 ### Files
-- MBA-Workshop.postman_collection.json - Postman collection of API calls
+- 1 · MBA Workshop — Minimal (Store API).postman_collection.json - Minimal collection for basic shopping experience
+- 2 · MBA Workshop — Advanced (Store API).postman_collection.json - Advanced collection for full shopping experience
+- 3 · MBA Workshop — Store API.postman_collection.json - Store API collection (OPTIONAL)
 - MBA-Workshop.postman_environment.json - environment variables for Postman
 
 ### Developers documentation
