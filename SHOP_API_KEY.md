@@ -1,3 +1,3 @@
-# SHOP API KEY:
+# SHOP API KEY
 
-to be shared later
+mk_live_QCZMJa75Z-tmpm8DHAr_Shj8SEyE4qt5
